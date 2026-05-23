@@ -56,6 +56,38 @@
 .assign-tag{font-size:10px;background:#e8f4e8;color:#2d7a2d;border-radius:4px;padding:1px 6px;margin-left:4px;font-weight:600}
 .assign-tag.unassigned{background:#f5f5f5;color:#999}
 
+/* ── Risk Score Card ─────────────────────────────────── */
+.risk-card{padding:12px 0 4px}
+.risk-score-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.risk-tier{border-radius:8px;padding:5px 14px;font-size:13px;font-weight:800;white-space:nowrap}
+.risk-tier.normal  {background:#DCFAE6;color:#067647}
+.risk-tier.watch   {background:#FEDF89;color:#B54708}
+.risk-tier.high    {background:#F9DBAF;color:#B93815}
+.risk-tier.critical{background:#FEE4E2;color:#B42318}
+.risk-bar-wrap{flex:1;height:10px;background:#e8e0c0;border-radius:5px;overflow:hidden}
+.risk-bar{height:100%;border-radius:5px;transition:width .4s}
+.risk-score-num{font-size:14px;font-weight:800;min-width:48px;text-align:right}
+.risk-flags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.rflag{border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700}
+.rflag-red   {background:#FEE4E2;color:#B42318}
+.rflag-orange{background:#FDEBD0;color:#C0392B}
+.rflag-yellow{background:#FEDF89;color:#B54708}
+.rflag-blue  {background:#D4ECFF;color:#1a4d8f}
+.rflag-purple{background:#E8D4FF;color:#6B21A8}
+.rflag-gray  {background:#F3F4F6;color:#4B5563}
+.rflag-black {background:#FFD4D4;color:#8B0000}
+.risk-action{border-radius:8px;padding:10px 14px;margin-top:2px}
+.risk-action.normal  {background:#EDFCF2;border:1px solid #ABEFC6}
+.risk-action.watch   {background:#FFFBEB;border:1px solid #FEDF89}
+.risk-action.high    {background:#FFF4ED;border:1px solid #F9DBAF}
+.risk-action.critical{background:#FFF0F0;border:1px solid #FEA3A3}
+.risk-action-row{display:flex;gap:8px;flex-wrap:wrap}
+.risk-act-cell{flex:1;min-width:120px}
+.risk-act-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.risk-act-val{font-size:13px;font-weight:700}
+.risk-escalate{display:inline-block;background:#D93025;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;margin-top:4px}
+.risk-meta{font-size:11px;color:#888;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+
 </style><link rel="stylesheet" href="volt-restyle.css">
 </head><body>
 <div class="assign-view" id="assignView">
@@ -463,10 +495,139 @@ function caseKey(c,suffix){return 'volt_'+suffix+'_'+noteKey(c)}
 function getCaseField(c,suffix){return localStorage.getItem(caseKey(c,suffix))||''}
 function setCaseField(idx,suffix,value){const c=customers[idx];localStorage.setItem(caseKey(c,suffix),String(value||''));renderReviewLayer()}
 function caseState(c){return {contact_status:localStorage.getItem('volt_cs_'+noteKey(c))||'',ptp_amount:localStorage.getItem('volt_pta_'+noteKey(c))||'',ptp_date:localStorage.getItem('volt_ptd_'+noteKey(c))||'',next_call_date:localStorage.getItem('volt_ncd_'+noteKey(c))||'',case_status:localStorage.getItem('volt_cas_'+noteKey(c))||'',penalty_status:getCaseField(c,'pen_status'),penalty_waiver:getCaseField(c,'pen_waiver'),penalty_effective:getCaseField(c,'pen_effective'),penalty_comment:getCaseField(c,'pen_comment'),restructure_type:getCaseField(c,'rst_type'),restructure_monthly:getCaseField(c,'rst_monthly'),restructure_down:getCaseField(c,'rst_down'),restructure_reason:getCaseField(c,'rst_reason'),restructure_status:getCaseField(c,'rst_status'),restructure_approved_by:getCaseField(c,'rst_approved_by'),restructure_review_date:getCaseField(c,'rst_review_date')}}
-function riskModel(c){const s=caseState(c);const dpd=Number(c.days_late||0);const overdue=Number(c.overdue||0);const lateFee=Number(c.late_fees||0);const brokenPtp=Boolean(s.ptp_date&&s.ptp_date<todayISO()&&c.status!=='Current'&&s.case_status!=='แก้ไขแล้ว / ชำระครบ');const activeRestructure=['Proposed','Trial','Approved'].includes(s.restructure_status);const brokenRestructure=Boolean(activeRestructure&&(dpd>=30||c.status==='NPL'||brokenPtp));const hiddenNpl=Boolean(c.status!=='NPL'&&(dpd>=90||brokenRestructure));const serviceIssue=Boolean((s.case_status||'').includes('ปัญหา')||(s.case_status||'').includes('ติดตั้ง'));let level='low';if(c.status==='NPL'||hiddenNpl||dpd>=90)level='critical';else if(dpd>=45||brokenPtp||brokenRestructure)level='high';else if(dpd>0||overdue>0||lateFee>0)level='medium';const flags=[];if(hiddenNpl)flags.push('Hidden NPL Review');if(c.status==='NPL')flags.push('NPL');if(brokenPtp)flags.push('Broken PTP');if(brokenRestructure)flags.push('Broken Restructure');if(lateFee>0)flags.push('Penalty Exposure');if(serviceIssue)flags.push('Service / Dispute');if(!flags.length)flags.push('Routine');return {level,flags,brokenPtp,brokenRestructure,hiddenNpl,serviceIssue,lateFee,score:(hiddenNpl?1000:0)+(c.status==='NPL'?900:0)+(brokenRestructure?500:0)+(brokenPtp?350:0)+dpd*3+overdue/1000+lateFee/100}}
-function recommendationFor(c){const r=riskModel(c);const dpd=Number(c.days_late||0);const s=caseState(c);if(r.hiddenNpl)return 'Recommend NPL Review';if(r.brokenRestructure)return 'Management review: restructure not paying';if(r.brokenPtp)return 'Follow broken PTP and reset next action';if(r.serviceIssue)return 'Service investigation before escalation';if(c.status==='NPL'||dpd>=90)return 'Legal / pre-legal escalation review';if(dpd>=45)return 'Collector follow-up + manager note';if(dpd>0)return 'Follow payment and confirm PTP';if(s.restructure_status==='Proposed')return 'Review restructure proposal';return c.recommended_action||'Routine monitoring'}
+function calcRiskScore(c){
+  let score=0;
+  const dpd=Number(c.days_late||0);
+  const mthsBehind=(Number(c.overdue||0))/(Number(c.monthly_pmt||1));
+  const paidRatio=(Number(c.paid||0))/(Number(c.pmt||1));
+  const feeBurden=(Number(c.late_fees||0))/(Number(c.monthly_pmt||1));
+  const remainRatio=(Number(c.remain||0))/(Number(c.pmt||1));
+  const contractAge=c.first_payment_date
+    ?(Date.now()-new Date(c.first_payment_date))/(1000*60*60*24*30):99;
+  // 1. DPD (max 40)
+  if(dpd>=90)score+=40;else if(dpd>=61)score+=35;else if(dpd>=31)score+=25;else if(dpd>=1)score+=10;
+  // 2. Severity (max 20)
+  if(mthsBehind>=2)score+=20;else if(mthsBehind>=1)score+=12;else if(mthsBehind>0)score+=5;
+  // 3. Stage Risk (max 15)
+  if(paidRatio<0.10)score+=15;else if(paidRatio<0.20)score+=12;else if(paidRatio<0.50)score+=8;else if(paidRatio<0.80)score+=3;
+  // 4. Asset Risk (max 10) — เฉพาะเมื่อค้างชำระ
+  if(c.status==='Late'||c.status==='NPL'){
+    if(c.pmt>=300000)score+=10;else if(c.pmt>=150000)score+=5;
+  }
+  // 5. Early Default (max 8)
+  if(dpd>0){if(contractAge<=3)score+=8;else if(paidRatio<0.15)score+=5;}
+  // 6. Late Fee Burden (max 7)
+  if(feeBurden>=3)score+=7;else if(feeBurden>=1)score+=4;
+  // 7. Hidden + Operational Signals (max 10)
+  if(c.npl_type&&c.status==='Current')score+=8;       // Ghost NPL — สำคัญมาก
+  if((c.dc_status||'').includes('3rd'))score+=4;
+  if(c.dc_comment==='Power Cutoff')score+=5;          // ตัดไฟแล้ว = วิกฤต
+  if((c.dc_comment||'').includes('Tech Issue')||c.dc_status==='Technical Issue')score+=3;
+  if((c.npl_type||'').includes('Decommission')||['Retrieve Asset','Terminate Contract'].includes(c.dc_comment))score+=5;
+  return Math.min(score,100);
+}
+
+function getRiskFlags(c){
+  const flags=[];
+  const paidRatio=(Number(c.paid||0))/(Number(c.pmt||1));
+  const remainRatio=(Number(c.remain||0))/(Number(c.pmt||1));
+  const feeBurden=(Number(c.late_fees||0))/(Number(c.monthly_pmt||1));
+  const contractAge=c.first_payment_date
+    ?(Date.now()-new Date(c.first_payment_date))/(1000*60*60*24*30):99;
+  const dpd=Number(c.days_late||0);
+  // Payment & Contract flags
+  const isCompound=dpd>0&&c.pmt>=200000&&contractAge<=3;
+  const isEarlyDef=dpd>0&&(contractAge<=3||paidRatio<0.15);
+  if(isCompound)flags.push({label:'🔥 Compound Risk',cls:'rflag-black'});
+  else if(isEarlyDef)flags.push({label:'⚡ Early Default',cls:'rflag-red'});
+  // Asset Risk แสดงเฉพาะเมื่อยังไม่มี Compound Risk (ซ้ำกัน)
+  if(!isCompound&&(c.status==='Late'||c.status==='NPL')&&c.pmt>=300000)flags.push({label:'📉 Asset Risk',cls:'rflag-black'});
+  if(c.npl_type&&c.status==='Current')flags.push({label:'👻 Ghost NPL',cls:'rflag-orange'});
+  if(feeBurden>=1)flags.push({label:'💸 Fee Spiral',cls:'rflag-yellow'});
+  // High Exposure — แสดงเฉพาะเมื่อยังไม่มี Early Default หรือ Compound (overlap)
+  if(remainRatio>0.80&&c.status==='Late'&&!isCompound&&!isEarlyDef)
+    flags.push({label:'📍 High Exposure',cls:'rflag-blue'});
+  // Operational flags
+  if(c.dc_comment==='Power Cutoff')flags.push({label:'🔌 Power Cutoff',cls:'rflag-red'});
+  if((c.dc_comment||'').includes('Tech Issue')||c.dc_status==='Technical Issue')
+    flags.push({label:'🔧 Tech Issue',cls:'rflag-orange'});
+  if((c.npl_type||'').includes('Decommission')||
+     ['Retrieve Asset','Terminate Contract'].includes(c.dc_comment))
+    flags.push({label:'📦 Decommission Pending',cls:'rflag-purple'});
+  return flags;
+}
+
+function getRiskRecommendation(score,flags){
+  const hasDecom   =flags.some(f=>f.label.includes('Decommission'));
+  const hasPower   =flags.some(f=>f.label.includes('Power Cutoff'));
+  const hasTech    =flags.some(f=>f.label.includes('Tech Issue'));
+  const hasCompound=flags.some(f=>f.label.includes('Compound'));
+  if(hasDecom) return{action:'ส่ง Field team ถอดคืน',priority:'โดยเร็ว',escalate:true};
+  if(hasPower) return{action:'ประสาน Service/Field ก่อน Collection',priority:'วันนี้',escalate:true};
+  if(hasTech)  return{action:'ส่ง Service team แก้ก่อน แล้วค่อย follow เงิน',priority:'48 ชม.',escalate:false};
+  if(hasCompound||score>=80)return{action:'Field Team + แจ้ง Manager ทันที',priority:'วันนี้',escalate:true};
+  if(score>=66)return{action:'Escalate — Legal / Field / Manager',priority:'วันนี้',escalate:true};
+  if(score>=41)return{action:'ติดตามด่วน / เสนอ Restructure',priority:'24 ชม.',escalate:false};
+  if(score>=21)return{action:'โทรแจ้งเตือน / ยืนยันวันชำระ',priority:'สัปดาห์นี้',escalate:false};
+  return{action:'ติดตามรอบปกติ',priority:'รอบถัดไป',escalate:false};
+}
+
+function riskTier(score){
+  if(score>=66)return{label:'🔴 Critical',cls:'critical',bar:'linear-gradient(90deg,#E67E22,#D93025)',color:'#B42318'};
+  if(score>=41)return{label:'🟠 High Risk',cls:'high',bar:'#E67E22',color:'#B93815'};
+  if(score>=21)return{label:'🟡 Watch',cls:'watch',bar:'#C49000',color:'#B54708'};
+  return{label:'🟢 Normal',cls:'normal',bar:'#1F9D55',color:'#067647'};
+}
+
+function riskCard(c){
+  const score=calcRiskScore(c);
+  const flags=getRiskFlags(c);
+  const rec=getRiskRecommendation(score,flags);
+  const tier=riskTier(score);
+  const dpd=Number(c.days_late||0);
+  const mthsBehind=((Number(c.overdue||0))/(Number(c.monthly_pmt||1))).toFixed(1);
+  const paidPct=Math.round((Number(c.paid||0))/(Number(c.pmt||1))*100);
+  const flagsHtml=flags.length
+    ?flags.map(f=>`<span class="rflag ${f.cls}">${f.label}</span>`).join('')
+    :`<span class="rflag rflag-gray">✓ ไม่พบสัญญาณเสี่ยงพิเศษ</span>`;
+  return `<div class="risk-card">
+    <div class="risk-score-row">
+      <div class="risk-tier ${tier.cls}">${tier.label}</div>
+      <div class="risk-bar-wrap"><div class="risk-bar" style="width:${score}%;background:${tier.bar}"></div></div>
+      <div class="risk-score-num" style="color:${tier.color}">${score}<span style="font-size:11px;font-weight:400;color:#999">/100</span></div>
+    </div>
+    <div class="risk-flags">${flagsHtml}</div>
+    <div class="risk-action ${tier.cls}">
+      <div class="risk-action-row">
+        <div class="risk-act-cell"><div class="risk-act-lbl">Action</div><div class="risk-act-val" style="color:${tier.color}">${escHtml(rec.action)}</div></div>
+        <div class="risk-act-cell"><div class="risk-act-lbl">Priority</div><div class="risk-act-val">${escHtml(rec.priority)}</div></div>
+      </div>
+      ${rec.escalate?'<div class="risk-escalate">⚠️ Escalate to Manager</div>':''}
+    </div>
+    <div class="risk-meta">DPD ${dpd} วัน | ค้าง ${mthsBehind} งวด | Paid ${paidPct}% | สัญญา ${money(c.pmt||0)} บาท</div>
+  </div>`;
+}
+
+// ── Legacy wrappers (ใช้ใน reviewRows/renderReviewLayer) ──────────────
+function riskModel(c){
+  const score=calcRiskScore(c);
+  const flags=getRiskFlags(c);
+  const dpd=Number(c.days_late||0);
+  const hiddenNpl=Boolean(c.npl_type&&c.status==='Current');
+  const brokenPtp=false;
+  const brokenRestructure=false;
+  let level='low';
+  if(score>=66)level='critical';
+  else if(score>=41)level='high';
+  else if(score>=21)level='medium';
+  return{level,flags:flags.map(f=>f.label),hiddenNpl,brokenPtp,brokenRestructure,
+    serviceIssue:flags.some(f=>f.label.includes('Tech')||f.label.includes('Power')),
+    lateFee:Number(c.late_fees||0),score};
+}
+function recommendationFor(c){return getRiskRecommendation(calcRiskScore(c),getRiskFlags(c)).action}
 function riskChip(text,level){return '<span class="risk-chip risk-'+level+'">'+escHtml(text)+'</span>'}
-function ruleChips(c){const r=riskModel(c);return r.flags.map(function(f){return riskChip(f,r.level)}).join('')}
+function ruleChips(c){return getRiskFlags(c).map(f=>'<span class="rflag '+f.cls+'">'+f.label+'</span>').join('')}
+
 function sel(actual,expected){return actual===expected?' selected':''}
 function opsPanels(c){const s=caseState(c);return '<div class="acc-section acc-warn"><div class="acc-header" onclick="toggleAcc(this)"><span>💰 Penalty / Late Fee Layer | ค่าปรับ</span><span class="acc-arrow">▶</span></div><div class="acc-body" style="display:none"><div class="ops-panel" style="border:none;margin:0;padding:0"><div class="ops-grid"><div><label>Penalty Status / สถานะค่าปรับ</label><select id="pen_status-'+c.idx+'" onchange="setCaseField('+c.idx+',\'pen_status\',this.value)"><option value="">-- เลือก --</option><option value="Accruing"'+sel(s.penalty_status,'Accruing')+'>Accruing — สะสมอยู่</option><option value="Frozen"'+sel(s.penalty_status,'Frozen')+'>Frozen — หยุดพัก</option><option value="Waived"'+sel(s.penalty_status,'Waived')+'>Waived — ยกเว้นแล้ว</option></select></div><div><label>Waiver Approval / การอนุมัติยกเว้น</label><select id="pen_waiver-'+c.idx+'" onchange="setCaseField('+c.idx+',\'pen_waiver\',this.value)"><option value="">-- เลือก --</option><option value="Pending"'+sel(s.penalty_waiver,'Pending')+'>Pending — รออนุมัติ</option><option value="Approved"'+sel(s.penalty_waiver,'Approved')+'>Approved — อนุมัติแล้ว</option><option value="Rejected"'+sel(s.penalty_waiver,'Rejected')+'>Rejected — ไม่อนุมัติ</option></select></div><div><label>Effective Date / วันที่มีผล</label><input type="date" id="pen_effective-'+c.idx+'" value="'+escHtml(s.penalty_effective)+'" oninput="setCaseField('+c.idx+',\'pen_effective\',this.value)"></div><div><label>Penalty Comment / หมายเหตุ</label><input id="pen_comment-'+c.idx+'" value="'+escHtml(s.penalty_comment)+'" oninput="setCaseField('+c.idx+',\'pen_comment\',this.value)" placeholder="เหตุผล freeze / waive / negotiation"></div></div><div style="margin-top:8px"><label style="font-size:11px;color:var(--muted)">Updated by / บันทึกโดย</label><input id="pen_updated_by-'+c.idx+'" type="text" placeholder="ชื่อผู้บันทึก" value="'+escHtml(localStorage.getItem('volt_comment_by')||'')+'" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;margin-top:4px"></div><button class="acc-save-btn" onclick="savePenalty('+c.idx+')">💾 บันทึกค่าปรับ / Save Penalty</button><div class="acc-save-status" id="pen_status_msg-'+c.idx+'"></div></div></div></div><div class="acc-section acc-warn"><div class="acc-header" onclick="toggleAcc(this)"><span>🔄 Restructure Proposal Workflow | การปรับโครงสร้าง</span><span class="acc-arrow">▶</span></div><div class="acc-body" style="display:none"><div class="ops-panel" style="border:none;margin:0;padding:0"><div class="ops-grid"><div><label>Restructure Type / ประเภทการปรับโครงสร้าง</label><select id="rst_type-'+c.idx+'" onchange="setCaseField('+c.idx+',\'rst_type\',this.value)"><option value="">-- เลือก --</option><option value="Temporary Relief"'+sel(s.restructure_type,'Temporary Relief')+'>Temporary Relief — พักชำระชั่วคราว</option><option value="Term Extension"'+sel(s.restructure_type,'Term Extension')+'>Term Extension — ขยายระยะเวลา</option><option value="Step-up Plan"'+sel(s.restructure_type,'Step-up Plan')+'>Step-up Plan — แบบขั้นบันได</option><option value="Settlement"'+sel(s.restructure_type,'Settlement')+'>Settlement — ยุติสัญญา</option></select></div><div><label>Approval Status / สถานะการอนุมัติ</label><select id="rst_status-'+c.idx+'" onchange="setCaseField('+c.idx+',\'rst_status\',this.value)"><option value="">-- เลือก --</option><option value="Proposed"'+sel(s.restructure_status,'Proposed')+'>Proposed — เสนอแล้ว</option><option value="Trial"'+sel(s.restructure_status,'Trial')+'>Trial — ทดลองชำระ</option><option value="Approved"'+sel(s.restructure_status,'Approved')+'>Approved — อนุมัติแล้ว</option><option value="Rejected"'+sel(s.restructure_status,'Rejected')+'>Rejected — ไม่อนุมัติ</option><option value="Cancelled"'+sel(s.restructure_status,'Cancelled')+'>Cancelled — ยกเลิก</option></select></div><div><label>Proposed Monthly / ยอดผ่อนที่เสนอ (บาท)</label><input type="number" id="rst_monthly-'+c.idx+'" min="0" step="0.01" value="'+escHtml(s.restructure_monthly)+'" oninput="setCaseField('+c.idx+',\'rst_monthly\',this.value)"></div><div><label>Down Payment / เงินดาวน์ (บาท)</label><input type="number" id="rst_down-'+c.idx+'" min="0" step="0.01" value="'+escHtml(s.restructure_down)+'" oninput="setCaseField('+c.idx+',\'rst_down\',this.value)"></div><div><label>Approved By / อนุมัติโดย</label><input id="rst_approved_by-'+c.idx+'" value="'+escHtml(s.restructure_approved_by)+'" oninput="setCaseField('+c.idx+',\'rst_approved_by\',this.value)"></div><div><label>Next Review Date / วันนัด Review</label><input type="date" id="rst_review_date-'+c.idx+'" value="'+escHtml(s.restructure_review_date)+'" oninput="setCaseField('+c.idx+',\'rst_review_date\',this.value)"></div><div style="grid-column:1/-1"><label>Reason / เหตุผลและเงื่อนไข</label><textarea id="rst_reason-'+c.idx+'" oninput="setCaseField('+c.idx+',\'rst_reason\',this.value)" placeholder="เหตุผลเสนอ restructure / เงื่อนไขที่ตกลงกับลูกค้า">'+escHtml(s.restructure_reason)+'</textarea></div></div><div style="margin-top:8px"><label style="font-size:11px;color:var(--muted)">Updated by / บันทึกโดย</label><input id="rst_updated_by-'+c.idx+'" type="text" placeholder="ชื่อผู้บันทึก" value="'+escHtml(localStorage.getItem('volt_comment_by')||'')+'" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;margin-top:4px"></div><button class="acc-save-btn" onclick="saveRestructure('+c.idx+')">💾 บันทึกการปรับโครงสร้าง / Save Restructure</button><div class="acc-save-status" id="rst_status_msg-'+c.idx+'"></div></div></div></div>'}
 function reviewRows(){return customers.map(function(c){return {c:c,r:riskModel(c),rec:recommendationFor(c)}}).filter(function(x){return x.r.level!=='low'||x.c.status==='NPL'||Number(x.c.days_late||0)>0}).sort(function(a,b){return b.r.score-a.r.score})}
@@ -474,7 +635,7 @@ function renderReviewLayer(){const cards=document.getElementById('reviewCards');
 function exportOperationalReviewCsv(){const headers=['crm_id','volt_id','customer_name','portfolio','province','status','dpd','overdue','late_fee','risk_level','risk_flags','recommendation','ptp_date','ptp_amount','case_status','penalty_status','penalty_waiver','restructure_type','restructure_status','proposed_monthly','down_payment','restructure_review_date'];const rows=reviewRows().map(function(x){const c=x.c;const s=caseState(c);return [c.crm_id,c.id,c.name,c.portfolio_type,c.province,c.status,c.days_late,c.overdue,c.late_fees,x.r.level,x.r.flags.join(' | '),x.rec,s.ptp_date,s.ptp_amount,s.case_status,s.penalty_status,s.penalty_waiver,s.restructure_type,s.restructure_status,s.restructure_monthly,s.restructure_down,s.restructure_review_date]});const csv='﻿'+[headers.join(','),...rows.map(function(row){return row.map(csvEscape).join(',')})].join('\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='VOLT_operational_risk_review_'+todayISO()+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
 window.setCaseField=setCaseField;window.renderReviewLayer=renderReviewLayer;window.exportOperationalReviewCsv=exportOperationalReviewCsv;
 
-window.setContactStatus=setContactStatus;window.setPtpAmount=setPtpAmount;window.setPtpDate=setPtpDate;window.setNextCallDate=setNextCallDate;window.setCaseStatus=setCaseStatus;window.copyCommentRow=copyCommentRow;window.submitComment=submitComment;window.setCommentBy=setCommentBy;window.receiveLatestComments=receiveLatestComments;window.openCommentLog=openCommentLog;function badge(s){return `<span class="badge" style="background:${colors[s]||'#667085'}">${s}</span>`}function statusClass(s){return s==='NPL'?'npl':s==='Late'?'late':s==='Not Installed'?'not-installed':'current'}function customerDetail(c){const mapLink=c.location?`<a class="btn primary" href="${c.location}" target="_blank" rel="noreferrer">เปิด Google Maps</a>`:'';const telLink=c.phone?`<a class="btn" href="#" onclick="navigator.clipboard&&navigator.clipboard.writeText('${c.phone}');window.open('https://phone.volt.co.th/webrtc/calls/history/','_blank','noopener');return false;">📞 ${c.phone}</a>`:'';const saved=(loadNotes()[noteKey(c)]||{}).note||'';return `<div class="accordion-detail"><div class="sticky-summary"><div class="ss-item"><span class="ss-label">DPD</span><span class="ss-value red">${money(c.days_late)} วัน</span></div><div class="ss-item"><span class="ss-label">ยอดค้างชำระ</span><span class="ss-value red">${money(c.overdue)}</span></div><div class="ss-item"><span class="ss-label">ค่างวด/เดือน</span><span class="ss-value yellow">${c.monthly_pmt ? money(c.monthly_pmt) : '-'}</span></div><div class="ss-item"><span class="ss-label">สถานะ</span><span class="ss-value">${c.status||''}</span></div></div><div class="detail-grid"><div class="detail-cell"><span class="muted">DPD / วันค้างชำระ</span><b>${money(c.days_late)} วัน</b></div><div class="detail-cell"><span class="muted">มูลค่าทั้งหมดตามสัญญา</span><b>${money(c.pmt)}</b></div><div class="detail-cell"><span class="muted">ยอดค้างชำระ</span><b>${money(c.overdue)}</b></div><div class="detail-cell"><span class="muted">จำนวนที่ชำระมาแล้ว</span><b>${money(c.paid)}</b></div><div class="detail-cell"><span class="muted">ค่างวด/เดือน</span><b>${c.monthly_pmt ? money(c.monthly_pmt) : '-'}</b></div><div class="detail-cell"><span class="muted">ยอดคงเหลือตามสัญญา</span><b>${money(c.remain)}</b></div><div class="detail-cell"><span class="muted">ค่าปรับ (Late Fee)</span><b>${c.late_fees ? money(c.late_fees) : '-'}</b></div><div class="detail-cell"><span class="muted">First Payment Date</span><b>${c.first_payment_date||'-'}</b></div></div><div class="acc-section ${riskModel(c).level==='critical'?'acc-danger':(riskModel(c).level==='high'||riskModel(c).level==='medium'?'acc-warn':'')} "><div class="acc-header" onclick="toggleAcc(this)"><span>🔍 Risk Review / Hidden NPL</span><span class="acc-arrow">▶</span></div><div class="acc-body" style="display:none"><div class="action-box ${riskModel(c).level==='critical'?'danger':(riskModel(c).level==='high'||riskModel(c).level==='medium'?'warn':'')} " style="margin:0"><b>Rule-Based Recommendation</b><br>${escHtml(recommendationFor(c))}<div style="margin-top:6px">${ruleChips(c)}</div></div></div></div><div class="comment-box"><div style="margin-bottom:8px;background:#FFFBE6;border:1.5px solid #C49000;border-radius:6px;padding:10px">
+window.setContactStatus=setContactStatus;window.setPtpAmount=setPtpAmount;window.setPtpDate=setPtpDate;window.setNextCallDate=setNextCallDate;window.setCaseStatus=setCaseStatus;window.copyCommentRow=copyCommentRow;window.submitComment=submitComment;window.setCommentBy=setCommentBy;window.receiveLatestComments=receiveLatestComments;window.openCommentLog=openCommentLog;function badge(s){return `<span class="badge" style="background:${colors[s]||'#667085'}">${s}</span>`}function statusClass(s){return s==='NPL'?'npl':s==='Late'?'late':s==='Not Installed'?'not-installed':'current'}function customerDetail(c){const mapLink=c.location?`<a class="btn primary" href="${c.location}" target="_blank" rel="noreferrer">เปิด Google Maps</a>`:'';const telLink=c.phone?`<a class="btn" href="#" onclick="navigator.clipboard&&navigator.clipboard.writeText('${c.phone}');window.open('https://phone.volt.co.th/webrtc/calls/history/','_blank','noopener');return false;">📞 ${c.phone}</a>`:'';const saved=(loadNotes()[noteKey(c)]||{}).note||'';return `<div class="accordion-detail"><div class="sticky-summary"><div class="ss-item"><span class="ss-label">DPD</span><span class="ss-value red">${money(c.days_late)} วัน</span></div><div class="ss-item"><span class="ss-label">ยอดค้างชำระ</span><span class="ss-value red">${money(c.overdue)}</span></div><div class="ss-item"><span class="ss-label">ค่างวด/เดือน</span><span class="ss-value yellow">${c.monthly_pmt ? money(c.monthly_pmt) : '-'}</span></div><div class="ss-item"><span class="ss-label">สถานะ</span><span class="ss-value">${c.status||''}</span></div></div><div class="detail-grid"><div class="detail-cell"><span class="muted">DPD / วันค้างชำระ</span><b>${money(c.days_late)} วัน</b></div><div class="detail-cell"><span class="muted">มูลค่าทั้งหมดตามสัญญา</span><b>${money(c.pmt)}</b></div><div class="detail-cell"><span class="muted">ยอดค้างชำระ</span><b>${money(c.overdue)}</b></div><div class="detail-cell"><span class="muted">จำนวนที่ชำระมาแล้ว</span><b>${money(c.paid)}</b></div><div class="detail-cell"><span class="muted">ค่างวด/เดือน</span><b>${c.monthly_pmt ? money(c.monthly_pmt) : '-'}</b></div><div class="detail-cell"><span class="muted">ยอดคงเหลือตามสัญญา</span><b>${money(c.remain)}</b></div><div class="detail-cell"><span class="muted">ค่าปรับ (Late Fee)</span><b>${c.late_fees ? money(c.late_fees) : '-'}</b></div><div class="detail-cell"><span class="muted">First Payment Date</span><b>${c.first_payment_date||'-'}</b></div></div><div class="acc-section ${(()=>{const _s=calcRiskScore(c);return _s>=66?'acc-danger':_s>=21?'acc-warn':''})()}"><div class="acc-header" onclick="toggleAcc(this)"><span>🔍 Risk Review / Collection Guidance</span><span class="acc-arrow">▶</span></div><div class="acc-body" style="display:${(c.status==='Late'||c.status==='NPL')?'block':'none'}">${riskCard(c)}</div></div></div><div class="comment-box"><div style="margin-bottom:8px;background:#FFFBE6;border:1.5px solid #C49000;border-radius:6px;padding:10px">
 <div style="font-weight:700;font-size:12px;color:#8B6500;margin-bottom:6px">📌 Manager Note : Read Only</div>
 <div id="mgrNoteDisplay-${c.idx}" style="font-size:12px;color:var(--text);min-height:40px;white-space:pre-wrap"></div>
 <div id="mgrNoteBy-${c.idx}" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
