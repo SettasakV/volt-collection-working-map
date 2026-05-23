@@ -267,6 +267,7 @@ function loadAssignData() {
     try {
       assignData = JSON.parse(_cached);
       renderAssignFilterBar();
+      setTimeout(()=>rebuild(), 100); // render รายการพร้อม badge
     } catch(e) {}
   }
 
@@ -575,10 +576,19 @@ function autoSplitAssign(){
     members:  JSON.stringify(members),
     assigned_by: localStorage.getItem('volt_comment_by') || 'system'
   };
+  // บันทึก assignment ลง localStorage ทันทีก่อน POST
+  voltIds.forEach((id, i) => {
+    assignData[id] = assignData[id] || {};
+    assignData[id].assigned_to = members[i % members.length];
+  });
+  try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
+  renderAssignFilterBar();
+  rebuild();
+
   postToScript_(payload, 'autoAssignFrame');
   setTimeout(() => {
     loadAssignData();
-    alert('✅ แบ่งงานเสร็จแล้ว! กำลังโหลดข้อมูลใหม่...');
+    alert('✅ แบ่งงานเสร็จแล้ว!');
   }, 2000);
 }
 window.setAssignFilter = setAssignFilter;
