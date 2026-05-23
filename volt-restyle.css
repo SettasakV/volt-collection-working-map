@@ -1,0 +1,951 @@
+/* ============================================================
+   VOLT Restyle — drop-in override for Collection Working Map
+   Include AFTER all existing styles. Targets the original
+   class names — no markup changes required.
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap");
+
+/* ---------- 1. Re-map the legacy variables to VOLT tokens ----------
+   The page's CSS already uses --blue, --line, --text etc. We rewire
+   them so most of the existing CSS picks up VOLT styling for free. */
+:root {
+  /* VOLT brand */
+  --volt-yellow:        #FFC400;
+  --volt-yellow-deep:   #E6B000;
+  --volt-yellow-soft:   #FFF4CC;
+  --volt-yellow-ring:   rgba(255, 196, 0, 0.28);
+
+  /* Re-mapped legacy vars */
+  --blue:   #FFC400;   /* was #C49000 — primary action becomes VOLT yellow */
+  --line:   #EAECF0;   /* was cream gold — now clean neutral */
+  --text:   #101828;   /* was #1a1200 — Untitled UI gray-900 */
+  --muted:  #667085;   /* was #7a6500 — gray-500 */
+  --bg:     #F9FAFB;   /* was #FFFDF0 cream — now gray-50 page bg */
+  --green:  #079455;   /* tightened success */
+  --yellow: #F79009;   /* warning amber */
+  --red:    #D30000;   /* VOLT red */
+  --gray:   #475467;   /* body */
+  --hero:   #1D2939;   /* dark slate-gray — softer than pure black */
+}
+
+/* ---------- 2. Type system ---------- */
+html, body {
+  font-family: "Inter", "IBM Plex Sans Thai", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background: var(--bg) !important;
+  color: var(--text);
+}
+body, button, input, select, textarea {
+  font-family: "Inter", "IBM Plex Sans Thai", system-ui, sans-serif !important;
+}
+h1, h2, h3, .side-title, .assign-title {
+  letter-spacing: -0.012em;
+  font-weight: 700;
+}
+
+/* ---------- 3. Wrap / cards ---------- */
+.wrap { max-width: 1440px; padding: 16px 24px 32px; }
+
+.card, .map-shell, .side,
+.summary-box, .detail-cell {
+  background: #FFFFFF !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  padding: 14px !important;
+  transition: box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card:hover {
+  box-shadow: 0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
+}
+.cards { gap: 12px !important; }
+.label, .muted { color: var(--muted) !important; font-weight: 500; font-size: 11px; letter-spacing: 0.02em; }
+.value { font-size: 26px !important; letter-spacing: -0.02em; font-weight: 800 !important; font-variant-numeric: tabular-nums; }
+
+/* ---------- 4. Hero ---------- */
+.hero {
+  background: var(--hero) !important;
+  border-radius: 14px !important;
+  padding: 18px 22px !important;
+  align-items: center;
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.35);
+}
+.hero-logo span {
+  font-size: 24px !important;
+  letter-spacing: -0.02em !important;
+  font-weight: 800 !important;
+}
+.hero-title { font-size: 13px !important; line-height: 1.5; opacity: 0.85; }
+.hero-title b {
+  color: var(--volt-yellow) !important;
+  font-size: 16px !important;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+.hero-snapshot {
+  font-size: 11px !important;
+  color: rgba(255, 255, 255, 0.78) !important;
+  opacity: 1 !important;
+  line-height: 1.7 !important;
+}
+/* Make the date itself pop — assumes the <br> separates label from date */
+.hero-snapshot br + * { display: inline; }
+
+/* Hero "⚡ VOLT" — keep emoji-bolt visible since it's already a header pattern,
+   but lift the type weight to feel more like the wordmark */
+
+/* ---------- 5. Top nav ---------- */
+.top-nav {
+  background: var(--hero) !important;
+  padding: 0 22px !important;
+  border-bottom: 1px solid rgba(255, 196, 0, 0.15);
+}
+.nav-item {
+  font-size: 13px !important;
+  letter-spacing: 0.01em;
+  padding: 12px 16px !important;
+  border-bottom-width: 3px !important;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nav-item.active { color: var(--volt-yellow) !important; border-bottom-color: var(--volt-yellow) !important; }
+
+/* ---------- 6. Stat strip below nav ---------- */
+[style*="border-bottom:1px solid var(--line)"][style*="padding:8px 20px"][style*="background:white"] {
+  background: white !important;
+  padding: 14px 24px !important;
+  border-radius: 0 0 12px 12px;
+  margin: 0 -4px;
+}
+[style*="border-right:1px solid var(--line)"] span[style*="font-size:16px"] {
+  font-size: 18px !important;
+  letter-spacing: -0.01em;
+}
+[style*="border-right:1px solid var(--line)"] span[style*="font-size:11px"] {
+  font-size: 11px !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* ---------- 7. Buttons ---------- */
+.btn {
+  border: 1px solid var(--line) !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: white;
+  color: var(--text);
+  cursor: pointer;
+}
+.btn:hover { background: #F9FAFB; }
+.btn.primary {
+  background: var(--volt-yellow) !important;
+  border-color: var(--volt-yellow) !important;
+  color: #101828 !important;
+  font-weight: 700 !important;
+}
+.btn.primary:hover { background: var(--volt-yellow-deep) !important; border-color: var(--volt-yellow-deep) !important; }
+
+.acc-save-btn,
+.login-box button {
+  background: var(--volt-yellow) !important;
+  color: #101828 !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  letter-spacing: 0;
+  transition: background 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.acc-save-btn:hover,
+.login-box button:hover {
+  background: var(--volt-yellow-deep) !important;
+}
+
+/* ---------- 8. Login overlay ---------- */
+.login-overlay {
+  background: var(--hero) !important;
+}
+.login-box {
+  background: white !important;
+  border-radius: 16px !important;
+  padding: 44px 40px !important;
+  width: 360px !important;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.45) !important;
+}
+.login-box h2 {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em;
+  color: var(--text) !important;
+  margin-bottom: 6px !important;
+}
+.login-box p { font-size: 13px !important; color: var(--muted) !important; }
+.login-box input {
+  border-width: 1px !important;
+  border-color: #D0D5DD !important;
+  border-radius: 10px !important;
+  padding: 12px 14px !important;
+  font-size: 15px !important;
+  letter-spacing: 0.12em;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.login-box input:focus {
+  border-color: var(--volt-yellow) !important;
+  box-shadow: 0 0 0 4px var(--volt-yellow-ring);
+}
+
+/* Replace the lonely big ⚡ above the title with a proper sun-ray mark */
+.login-box > div:first-child {
+  font-size: 0 !important;
+  margin-bottom: 18px !important;
+  height: 44px;
+  background: url("assets/volt-mark.svg") center/contain no-repeat;
+}
+
+/* ---------- 9. Customer modal ---------- */
+.customer-modal-box {
+  background: white !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 48px -12px rgba(16, 24, 40, 0.25) !important;
+}
+.customer-modal-header {
+  background: var(--hero) !important;
+  border-radius: 16px 16px 0 0 !important;
+  padding: 14px 18px !important;
+  font-weight: 700 !important;
+}
+
+/* ---------- 10. Assignment view ---------- */
+.assign-box {
+  background: white !important;
+  border-radius: 16px !important;
+  padding: 28px !important;
+  box-shadow: 0 24px 48px -12px rgba(16, 24, 40, 0.20);
+}
+.assign-header {
+  border-bottom: 2px solid var(--volt-yellow) !important;
+  padding-bottom: 14px !important;
+}
+.assign-title {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em;
+  color: var(--text) !important;
+}
+.assign-table {
+  font-size: 13px !important;
+}
+.assign-table th {
+  background: var(--hero) !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.02em;
+  padding: 10px 12px !important;
+}
+.assign-table td {
+  padding: 10px 12px !important;
+  border-bottom-color: var(--line) !important;
+}
+.assign-table tr:hover td { background: #FFFEF5 !important; }
+
+.assign-select, select, input[type=text], input[type=password] {
+  border: 1px solid #D0D5DD !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  background: white;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--text);
+  outline: none;
+}
+.assign-select:focus, select:focus,
+input[type=text]:focus, input[type=password]:focus,
+textarea:focus {
+  border-color: var(--volt-yellow) !important;
+  box-shadow: 0 0 0 4px var(--volt-yellow-ring) !important;
+}
+
+/* ---------- 11. Badges + status pills ---------- */
+.badge, .assign-badge {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 3px 10px !important;
+  border-radius: 999px !important;
+  letter-spacing: 0.02em;
+  min-width: 0 !important;
+}
+
+/* ---------- 12. Tables ---------- */
+table { border-spacing: 0; border-collapse: separate; }
+th, td {
+  border: 0 !important;
+  border-bottom: 1px solid var(--line) !important;
+  padding: 11px 14px !important;
+  font-size: 13px !important;
+}
+th {
+  background: var(--hero) !important;
+  color: white;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+th:first-child { border-top-left-radius: 10px; }
+th:last-child  { border-top-right-radius: 10px; }
+tbody tr:hover { background: #FFFEF5 !important; }
+tbody tr:last-child td { border-bottom: 0 !important; }
+
+/* ---------- 13. Map ---------- */
+#map {
+  border-radius: 12px !important;
+  border-color: var(--line) !important;
+  background: linear-gradient(180deg, #F2F4F7 0%, #EAECF0 100%) !important;
+  color: var(--muted) !important;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px rgba(16, 24, 40, 0.02);
+}
+
+/* ---------- 14. List items ---------- */
+.list { border-top-color: var(--line) !important; }
+.item {
+  padding: 12px 4px !important;
+  border-bottom-color: var(--line) !important;
+}
+.customer-link { color: var(--text) !important; font-weight: 700 !important; }
+.side-title {
+  font-size: 18px !important;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- 15. Accordion sections inside customer detail ---------- */
+.acc-section {
+  border-radius: 10px !important;
+  border-color: var(--line) !important;
+  margin: 10px 0 !important;
+}
+.acc-header {
+  padding: 12px 14px !important;
+  background: white !important;
+  font-size: 13px !important;
+  color: var(--text) !important;
+  font-weight: 700 !important;
+}
+.acc-header:hover { background: #F9FAFB !important; }
+.acc-danger > .acc-header  { background: #FEF3F2 !important; color: #B42318 !important; border-bottom-color: #FECDCA !important; }
+.acc-warn   > .acc-header  { background: #FFFAEB !important; color: #B54708 !important; border-bottom-color: #FEDF89 !important; }
+
+/* ---------- 16. Action / field boxes ---------- */
+.action-box {
+  background: var(--volt-yellow-soft) !important;
+  border-left: 3px solid var(--volt-yellow) !important;
+  border-radius: 10px !important;
+  padding: 12px 14px !important;
+  font-size: 13px !important;
+  line-height: 1.55;
+}
+.field-required {
+  background: white !important;
+  border: 1px solid var(--line) !important;
+  border-left: 3px solid var(--volt-yellow) !important;
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+}
+.field-required label {
+  color: #667085 !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.field-optional {
+  background: var(--bg) !important;
+  border-radius: 10px !important;
+}
+
+/* ---------- 17. Toolbar ---------- */
+.toolbar { gap: 12px !important; margin-bottom: 12px !important; }
+.toolbar input[type=text] {
+  width: 320px !important;
+  padding: 9px 12px !important;
+  border: 1px solid #D0D5DD !important;
+}
+
+/* ---------- 18. Sticky-summary (the small dark strip) ---------- */
+.sticky-summary {
+  background: var(--hero) !important;
+  border-radius: 10px !important;
+  padding: 10px 16px !important;
+  gap: 24px !important;
+}
+.sticky-summary .ss-label { font-size: 10px !important; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+.sticky-summary .ss-value { font-size: 14px !important; font-weight: 700 !important; font-variant-numeric: tabular-nums; }
+
+/* ---------- 19. Misc gold-button overrides we couldn't catch by class ----------
+   These hit inline-styled selects + buttons that hard-coded #C49000 in the markup */
+[style*="#C49000"] {
+  /* For inline-style elements (selects, borders, etc.), VOLT yellow is too
+     bright as a 1px border — use a softer outline instead. */
+}
+select[style*="border:1px solid #C49000"],
+input[style*="border:1px solid #C49000"] {
+  border: 1px solid #D0D5DD !important;
+}
+button[onclick="closeAssignView()"],
+button[onclick="closeCustomerModal()"] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 8px !important;
+}
+
+/* ---------- 20. Status colors (markers + dots) ---------- */
+.customer-marker.current,      .dot[style*="green"]      { background: var(--green) !important; }
+.customer-marker.late,         .dot[style*="yellow"]     { background: var(--yellow) !important; }
+.customer-marker.npl,          .dot[style*="red"]        { background: var(--red) !important; }
+.customer-marker.not-installed                            { background: #98A2B3 !important; }
+
+/* ---------- 21. Focus ring fallback ---------- */
+button:focus-visible, .btn:focus-visible, .nav-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--volt-yellow-ring);
+  border-radius: 8px;
+}
+
+/* ---------- 22. Tighten body type weight + line-height ---------- */
+body { font-size: 14px; line-height: 1.5; }
+
+/* ============================================================
+   v2 — Targeted overrides for inline styles in the source HTML.
+   The original page hard-codes hex colors directly in style="..."
+   attributes, which the variable-rewire above can't reach. We
+   override those by attribute selector below.
+   ============================================================ */
+
+/* ---------- A. Stat-strip row (the row with "ลูกค้าทั้งหมด 1004 / New CP 598 …") ---------- */
+/* Container: stop wrapping awkwardly, give it room, give it a card feel */
+[style*="background:white"][style*="border-bottom:1px solid var(--line)"][style*="padding:8px 20px"] {
+  background: white !important;
+  padding: 16px 20px !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  gap: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--line) !important;
+  margin: 12px 0 !important;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+/* Each stat cell — match ANY direct child of the strip (Late uses border-right padding, NPL doesn't) */
+[style*="background:white"][style*="border-bottom:1px solid var(--line)"][style*="padding:8px 20px"] > div {
+  padding: 4px 20px !important;
+  flex: none;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  border-right: 1px solid var(--line) !important;
+  margin-right: 0 !important;
+}
+[style*="background:white"][style*="border-bottom:1px solid var(--line)"][style*="padding:8px 20px"] > div:first-child {
+  padding-left: 4px !important;
+}
+[style*="background:white"][style*="border-bottom:1px solid var(--line)"][style*="padding:8px 20px"] > div:last-child {
+  border-right: 0 !important;
+}
+/* Label inside ANY stat cell */
+[style*="background:white"][style*="border-bottom:1px solid var(--line)"][style*="padding:8px 20px"] > div > span[style*="font-size:11px"] {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  margin-left: 0 !important;
+  display: block !important;
+}
+/* Value inside ANY stat cell */
+[style*="background:white"][style*="border-bottom:1px solid var(--line)"][style*="padding:8px 20px"] > div > span[style*="font-size:16px"] {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+  margin-left: 0 !important;
+  font-variant-numeric: tabular-nums;
+  display: block !important;
+}
+
+/* ---------- B. Kill inline hard-coded "muddy gold" colors ---------- */
+/* Late label/value (was color:#b7791f, brown) → vivid orange */
+[style*="color:#b7791f"], [style*="color: #b7791f"] {
+  color: #FB6514 !important;
+}
+/* Various #C49000 inline borders/colors → use neutral or VOLT yellow */
+[style*="color:#C49000"], [style*="color: #C49000"] {
+  color: var(--text) !important;
+}
+/* Mustard-gold helper labels (color:#8B6500) → muted neutral */
+[style*="color:#8B6500"], [style*="color: #8B6500"] {
+  color: var(--muted) !important;
+}
+/* Cream highlight rows (background:#FFFBE6) → soft yellow tint */
+[style*="background:#FFFBE6"], [style*="background: #FFFBE6"] {
+  background: #FFFBEB !important;
+}
+/* Greens kept as success */
+[style*="color:#1f9d55"], [style*="color: #1f9d55"] {
+  color: #079455 !important;
+}
+
+/* ---------- C. Replace ⚡ emoji in hero with the real VOLT wordmark ---------- */
+.hero-logo {
+  gap: 0 !important;
+}
+.hero-logo span {
+  /* Hide the "⚡ VOLT" text */
+  font-size: 0 !important;
+  width: 116px;
+  height: 38px;
+  display: inline-block;
+  background: url("assets/volt-logo-white.svg") left center / contain no-repeat;
+}
+
+/* ---------- D. Filter checkbox row (Current / Not Installed / Late / NPL) ---------- */
+/* Style the toolbar where status filters live as chip group */
+.toolbar {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+.toolbar > label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 12px !important;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toolbar > label:hover {
+  background: white;
+  border-color: #D0D5DD;
+}
+.toolbar > label:has(input:checked) {
+  background: white;
+  border-color: var(--volt-yellow);
+  box-shadow: 0 0 0 3px var(--volt-yellow-ring);
+}
+.toolbar input[type="checkbox"] {
+  accent-color: var(--volt-yellow);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+.toolbar input[type="text"] {
+  flex: 1;
+  min-width: 280px;
+  background: white;
+}
+
+/* ---------- E. Status dots (already colored, but enforce size) ---------- */
+.dot {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  display: inline-block;
+}
+
+/* ---------- F. The page background should breathe ---------- */
+body { background: #F2F4F7 !important; }
+.wrap { background: transparent; }
+
+/* ---------- G. Map shell — match new card style ---------- */
+.map-shell {
+  padding: 0 !important;
+  overflow: hidden;
+}
+#map {
+  border-radius: 0 !important;
+  border: 0 !important;
+}
+
+/* ---------- H. Final hero polish ---------- */
+.hero {
+  margin-bottom: 0 !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+.top-nav {
+  border-radius: 0 0 16px 16px !important;
+  margin-bottom: 16px !important;
+}
+
+/* ---------- I. Side / list panel ---------- */
+.side-title {
+  font-size: 20px !important;
+  letter-spacing: -0.02em;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0 !important;
+}
+.summary-grid { gap: 10px !important; margin: 14px 0 !important; }
+.summary-box {
+  padding: 12px !important;
+  border-radius: 10px !important;
+}
+.summary-box .label {
+  font-size: 11px !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.summary-box [style*="font-size"][style*="bold"],
+.summary-box b {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   v3 — Map area polish + right summary panel
+   ============================================================ */
+
+/* ---------- Filter chips (toolbar) — softer ---------- */
+.toolbar > label {
+  background: white !important;
+  border: 1px solid #D0D5DD !important;
+  border-radius: 999px !important;
+  padding: 7px 14px 7px 12px !important;
+  font-size: 13px !important;
+  color: var(--text);
+  box-shadow: none !important;
+}
+.toolbar > label:hover {
+  border-color: #98A2B3 !important;
+  background: #FAFBFC !important;
+}
+.toolbar > label:has(input:checked) {
+  background: var(--volt-yellow-soft) !important;
+  border-color: var(--volt-yellow) !important;
+  box-shadow: none !important;
+}
+.toolbar > label:has(input:checked) .dot { transform: scale(1.1); }
+.toolbar input[type=checkbox] {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* ---------- Search input — hero pill with magnifier ---------- */
+.toolbar { position: relative; gap: 10px !important; }
+#searchBox {
+  flex: 1 !important;
+  min-width: 280px !important;
+  padding: 11px 16px 11px 42px !important;
+  font-size: 14px !important;
+  border: 1px solid #D0D5DD !important;
+  border-radius: 10px !important;
+  background-color: white !important;
+  /* SVG magnifier icon, embedded */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.3-4.3'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 14px center;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+#searchBox:focus {
+  border-color: var(--volt-yellow) !important;
+  box-shadow: 0 0 0 4px var(--volt-yellow-ring), 0 1px 2px rgba(16, 24, 40, 0.05) !important;
+}
+
+/* ---------- Map shell — softer card ---------- */
+.map-shell {
+  padding: 16px !important;
+  background: white !important;
+  border-radius: 16px !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+}
+#map {
+  height: 760px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--line) !important;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(16, 24, 40, 0.02);
+}
+
+/* ---------- Footnote under map ---------- */
+.map-shell .note,
+.map-shell > div:last-child {
+  font-size: 11px !important;
+  color: var(--muted) !important;
+  margin-top: 10px !important;
+  padding: 8px 12px !important;
+  background: var(--bg) !important;
+  border-radius: 8px !important;
+  border-left: 3px solid var(--line) !important;
+  line-height: 1.5;
+}
+
+/* ---------- Leaflet zoom buttons — modern card ---------- */
+.leaflet-control-zoom {
+  border: 0 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 12px -2px rgba(16, 24, 40, 0.12), 0 2px 4px -2px rgba(16, 24, 40, 0.06) !important;
+  overflow: hidden;
+}
+.leaflet-control-zoom a {
+  background: white !important;
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 17px !important;
+  border-bottom: 1px solid var(--line) !important;
+}
+.leaflet-control-zoom a:last-child {
+  border-bottom: 0 !important;
+}
+.leaflet-control-zoom a:hover {
+  background: var(--bg) !important;
+  color: var(--volt-yellow-deep) !important;
+}
+
+/* ---------- Leaflet attribution — make small + tasteful ---------- */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.85) !important;
+  font-size: 10px !important;
+  padding: 2px 8px !important;
+  border-radius: 4px 0 0 0;
+}
+
+/* ---------- Marker cluster — VOLT-tinted ---------- */
+.marker-cluster {
+  border: 2px solid white !important;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.25) !important;
+}
+.marker-cluster div { font-family: "Inter", sans-serif !important; }
+
+/* ---------- Right panel: "รายการที่แสดง" ---------- */
+.side {
+  padding: 22px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+}
+.side .side-title {
+  font-size: 18px !important;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px !important;
+}
+.side .muted {
+  font-size: 12px !important;
+  color: var(--muted) !important;
+}
+
+/* Summary grid of 4 boxes (Current/Not Installed/Late/NPL) */
+.summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 8px !important;
+  margin: 10px 0 12px !important;
+}
+.summary-box {
+  padding: 9px 11px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--line) !important;
+  background: white !important;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex !important;
+  flex-direction: column-reverse !important;
+  gap: 2px;
+  position: relative;
+}
+.summary-box:hover {
+  border-color: #D0D5DD !important;
+  box-shadow: 0 2px 6px -1px rgba(16, 24, 40, 0.06);
+}
+/* Status dot — small colored circle on the label row */
+.summary-box > .label::before,
+.summary-box > .muted::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--muted);
+}
+.summary-box:nth-child(1) > .label::before,
+.summary-box:nth-child(1) > .muted::before { background: var(--green); }
+.summary-box:nth-child(2) > .label::before,
+.summary-box:nth-child(2) > .muted::before { background: var(--gray); }
+.summary-box:nth-child(3) > .label::before,
+.summary-box:nth-child(3) > .muted::before { background: #FB6514; }
+.summary-box:nth-child(4) > .label::before,
+.summary-box:nth-child(4) > .muted::before { background: var(--red); }
+
+.summary-box > .label,
+.summary-box > .muted {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted) !important;
+  margin-top: 1px;
+  display: flex !important;
+  align-items: center;
+}
+.summary-box > b,
+.summary-box > [style*="font-weight:700"],
+.summary-box > [style*="font-weight: 700"] {
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.1 !important;
+}
+
+/* ---------- Customer list inside side panel ---------- */
+.list {
+  height: calc(100vh - 320px) !important;
+  border-top: 1px solid var(--line) !important;
+  padding-top: 4px !important;
+}
+.item {
+  padding: 12px 8px !important;
+  margin: 0 -8px !important;
+  border-bottom: 1px solid var(--line) !important;
+  border-radius: 8px;
+  transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.item:hover { background: var(--bg); }
+
+/* ---------- Main two-column grid: map / side panel ---------- */
+.main {
+  gap: 16px !important;
+}
+
+/* ============================================================
+   v4 — Province table enhancement
+   Paired with volt-province-enhance.js
+   ============================================================ */
+
+.province-enhance {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 18px 8px;
+  margin-top: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+.prov-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.prov-title { display: flex; flex-direction: column; gap: 2px; }
+.prov-title-main {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.prov-title-sub {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.prov-title-hint {
+  margin-top: 4px;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #854708;
+  background: #FEF0C7;
+  border: 1px solid #FEDF89;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+.prov-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#provSearch {
+  padding: 8px 12px 8px 36px !important;
+  border: 1px solid #D0D5DD !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  background-color: white !important;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.3-4.3'/></svg>") !important;
+  background-repeat: no-repeat !important;
+  background-position: 12px center !important;
+  width: 220px;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+#provSearch:focus {
+  border-color: var(--volt-yellow) !important;
+  box-shadow: 0 0 0 4px var(--volt-yellow-ring) !important;
+}
+#provToggle {
+  padding: 8px 14px;
+  background: var(--volt-yellow);
+  color: var(--text);
+  border: 0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+#provToggle:hover { background: var(--volt-yellow-deep); }
+#provToggle.is-disabled {
+  background: var(--bg);
+  color: var(--muted);
+  cursor: default;
+}
+
+/* Inside .province-enhance, kill the default table top margin */
+.province-enhance #provinceTable {
+  margin-top: 0 !important;
+}
+.province-enhance #provinceTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.province-enhance {
+  max-height: 640px;
+  overflow-y: auto;
+}
+.province-enhance .prov-head {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 3;
+  padding-bottom: 4px;
+}
+
+
