@@ -276,7 +276,10 @@ function loadAssignData() {
     try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
     delete window[cb1];
     if (!teamMembers.length) { teamMembers = DEFAULT_TEAM; populateTeamDropdown(); }
-    assignLoaded = true; renderAssignTable(); renderAssignFilterBar();
+    assignLoaded = true;
+    renderAssignTable();
+    renderAssignFilterBar();
+    rebuild(); // re-render รายการพร้อม assignment tags
   };
   window[cb2] = function(data) {
     teamMembers = (data && data.length) ? data : DEFAULT_TEAM;
@@ -286,7 +289,7 @@ function loadAssignData() {
   // Timeout fallback
   setTimeout(() => {
     if (!teamMembers.length) { teamMembers = DEFAULT_TEAM; populateTeamDropdown(); }
-    if (!assignLoaded) { assignLoaded = true; renderAssignTable(); }
+    if (!assignLoaded) { assignLoaded = true; renderAssignTable(); renderAssignFilterBar(); rebuild(); }
   }, 4000);
   const s1 = document.createElement('script');
   s1.src = COMMENT_SUBMIT_URL + '?action=get_assignments&callback=' + cb1;
