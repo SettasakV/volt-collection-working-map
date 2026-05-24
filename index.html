@@ -184,6 +184,7 @@ function checkPw(){
   <a class="nav-item active" id="nav-map" onclick="switchNav('map')">🗺️ Collection Map</a>
   <a class="nav-item" id="nav-assign" onclick="switchNav('assign')">📋 Assignment</a>
   <a class="nav-item" id="nav-review" onclick="switchNav('review')">Risk Review</a>
+  <a class="nav-item" id="nav-kpi" onclick="switchNav('kpi')">📊 KPI</a>
 </nav><div style="background:white;border-bottom:1px solid var(--line);padding:8px 20px;display:flex;align-items:center;gap:0;flex-wrap:wrap">
   <div style="padding:4px 16px 4px 0;border-right:1px solid var(--line);margin-right:16px">
     <span style="font-size:11px;color:var(--muted)">ลูกค้าทั้งหมด</span>
@@ -277,9 +278,12 @@ function switchNav(section) {
   if (navEl) navEl.classList.add('active');
   const review = document.getElementById('reviewLayer');
   if (review) review.classList.toggle('open', section === 'review');
+  const kpiSec = document.getElementById('kpiSection');
+  if (kpiSec) kpiSec.style.display = section === 'kpi' ? 'block' : 'none';
   if (section === 'assign') openAssignView();
   if (section === 'review') { closeAssignView(); renderReviewLayer(); review && review.scrollIntoView({behavior:'smooth', block:'start'}); }
   if (section === 'map') { closeAssignView(); }
+  if (section === 'kpi') { closeAssignView(); loadKpi('month'); }
 }
 
 function closeAssignView() {
@@ -695,6 +699,101 @@ function saveRestructure(idx){
   setTimeout(()=>{if(msg)msg.textContent='✅ บันทึกแล้ว '+new Date().toLocaleTimeString('th-TH');},1500);
 }
 
+
+function loadKpi(period, btnEl) {
+  // อัปเดต active tab
+  document.querySelectorAll('.kpi-ptab').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  else {
+    const tabs = document.querySelectorAll('.kpi-ptab');
+    if (period === 'month' && tabs[0]) tabs[0].classList.add('active');
+    else if (period === 'week' && tabs[1]) tabs[1].classList.add('active');
+    else if (period === 'all' && tabs[2]) tabs[2].classList.add('active');
+  }
+  document.getElementById('kpiTableWrap').innerHTML = '<div class="kpi-empty">กำลังโหลดข้อมูล...</div>';
+  document.getElementById('kpiSummaryGrid').innerHTML = '';
+
+  const cb = 'kpiCb_' + Date.now();
+  window[cb] = function(data) {
+    delete window[cb];
+    renderKpi(data);
+  };
+  const s = document.createElement('script');
+  s.src = 'https://script.google.com/a/macros/volt.co.th/s/AKfycby-vMGTI1t39FS4G5v1Dkdl3s9th4TzHTmljIenydR4QBNpzM9_rZ7RdzZcSpXF7KVabQ/exec?action=get_kpi&period=' + period + '&callback=' + cb;
+  document.head.appendChild(s);
+  setTimeout(() => { if (window[cb]) { delete window[cb]; document.getElementById('kpiTableWrap').innerHTML = '<div class="kpi-empty">โหลดไม่สำเร็จ — ตรวจสอบการ Deploy Apps Script</div>'; } }, 10000);
+}
+
+function renderKpi(data) {
+  if (!data || !data.officers) return;
+  const t = data.total || {};
+  const periodLabel = data.period === 'week' ? '7 วันที่ผ่านมา' : data.period === 'month' ? 'เดือนนี้' : 'ทั้งหมด';
+
+  // Summary cards
+  const grid = document.getElementById('kpiSummaryGrid');
+  grid.innerHTML = [
+    ['total_contacts', t.total_contacts || 0, 'การติดต่อทั้งหมด', false],
+    ['successful', t.successful || 0, 'ติดต่อสำเร็จ', false],
+    ['success_rate', (t.success_rate || 0) + '%', 'อัตราสำเร็จ', true],
+    ['ptp_count', t.ptp_count || 0, 'รายที่นัดชำระ', false],
+    ['ptp_amount', (t.ptp_amount || 0).toLocaleString('th-TH'), 'ยอดนัดชำระ (บาท)', true],
+    ['cases_closed', t.cases_closed || 0, 'เคสปิดแล้ว', false],
+  ].map(([k, v, lbl, hl]) =>
+    `<div class="kpi-stat ${hl ? 'highlight' : ''}">
+      <div class="kpi-stat-val">${v}</div>
+      <div class="kpi-stat-lbl">${lbl}</div>
+    </div>`
+  ).join('');
+
+  // Officer table
+  const rows = data.officers.map(o => {
+    const rate = o.success_rate || 0;
+    return `<tr>
+      <td><strong>${escHtml(o.officer)}</strong></td>
+      <td style="text-align:center">${o.total_contacts}</td>
+      <td style="text-align:center">${o.successful}</td>
+      <td>
+        <div class="kpi-bar-cell">
+          ${rate}%
+          <div class="kpi-bar-bg"><div class="kpi-bar-fg" style="width:${rate}%"></div></div>
+        </div>
+      </td>
+      <td style="text-align:center">${o.ptp_count}</td>
+      <td style="text-align:right">${(o.ptp_amount||0).toLocaleString('th-TH')}</td>
+      <td style="text-align:center">${o.cases_closed}</td>
+    </tr>`;
+  }).join('');
+
+  const totalRow = `<tr class="total-row">
+    <td>รวมทั้งหมด</td>
+    <td style="text-align:center">${t.total_contacts||0}</td>
+    <td style="text-align:center">${t.successful||0}</td>
+    <td>${t.success_rate||0}%</td>
+    <td style="text-align:center">${t.ptp_count||0}</td>
+    <td style="text-align:right">${(t.ptp_amount||0).toLocaleString('th-TH')}</td>
+    <td style="text-align:center">${t.cases_closed||0}</td>
+  </tr>`;
+
+  document.getElementById('kpiTableWrap').innerHTML = `
+    <table class="kpi-table">
+      <thead><tr>
+        <th>Officer</th>
+        <th style="text-align:center">การติดต่อ</th>
+        <th style="text-align:center">สำเร็จ</th>
+        <th>อัตราสำเร็จ</th>
+        <th style="text-align:center">นัดชำระ</th>
+        <th style="text-align:right">ยอดนัดชำระ</th>
+        <th style="text-align:center">เคสปิด</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="kpi-empty">ยังไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody>
+      <tfoot>${totalRow}</tfoot>
+    </table>`;
+
+  document.getElementById('kpiNote').textContent =
+    'ข้อมูล: ' + periodLabel + ' | อัปเดต: ' + (data.generated_at || '') +
+    ' | หมายเหตุ: ยอดนัดชำระ = PTP ที่บันทึกใน Comment Log เท่านั้น';
+}
+window.loadKpi = loadKpi;
 window.savePenalty=savePenalty;
 window.saveRestructure=saveRestructure;
 
