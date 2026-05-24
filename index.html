@@ -789,43 +789,111 @@ function renderKpi(data) {
   const t = data.total || {};
   const periodLabel = data.period === 'week' ? '7 วันที่ผ่านมา' : data.period === 'month' ? 'เดือนนี้' : 'ทั้งหมด';
 
-  // Summary cards
+  // ─── Summary cards (ยอดรวมทีม) ──────────────────────────────────────
   const grid = document.getElementById('kpiSummaryGrid');
   grid.innerHTML = [
-    ['total_contacts', t.total_contacts || 0, 'การติดต่อทั้งหมด', false],
-    ['successful', t.successful || 0, 'ติดต่อสำเร็จ', false],
-    ['success_rate', (t.success_rate || 0) + '%', 'อัตราสำเร็จ', true],
-    ['ptp_count', t.ptp_count || 0, 'รายที่นัดชำระ', false],
-    ['ptp_amount', (t.ptp_amount || 0).toLocaleString('th-TH'), 'ยอดนัดชำระ (บาท)', true],
-    ['cases_closed', t.cases_closed || 0, 'เคสปิดแล้ว', false],
-  ].map(([k, v, lbl, hl]) =>
+    [t.total_contacts || 0, 'การติดต่อทั้งหมด', false],
+    [t.successful || 0, 'ติดต่อสำเร็จ', false],
+    [(t.success_rate || 0) + '%', 'อัตราสำเร็จ', true],
+    [t.ptp_count || 0, 'รายที่นัดชำระ', false],
+    [(t.ptp_amount || 0).toLocaleString('th-TH'), 'ยอดนัดชำระ (บาท)', true],
+    [t.cases_closed || 0, 'เคสปิดแล้ว', false],
+  ].map(([v, lbl, hl]) =>
     `<div class="kpi-stat ${hl ? 'highlight' : ''}">
       <div class="kpi-stat-val">${v}</div>
       <div class="kpi-stat-lbl">${lbl}</div>
     </div>`
   ).join('');
 
-  // Officer table
-  const rows = data.officers.map(o => {
-    const rate = o.success_rate || 0;
-    return `<tr>
-      <td><strong>${escHtml(o.officer)}</strong></td>
-      <td style="text-align:center">${o.total_contacts}</td>
-      <td style="text-align:center">${o.successful}</td>
-      <td>
-        <div class="kpi-bar-cell">
-          ${rate}%
-          <div class="kpi-bar-bg"><div class="kpi-bar-fg" style="width:${rate}%"></div></div>
-        </div>
-      </td>
-      <td style="text-align:center">${o.ptp_count}</td>
-      <td style="text-align:right">${(o.ptp_amount||0).toLocaleString('th-TH')}</td>
-      <td style="text-align:center">${o.cases_closed}</td>
-    </tr>`;
-  }).join('');
+  // ─── ตาราง KPI (แยก segment ต่อคน) ──────────────────────────────────
+  // สีพื้นหลังตาม segment
+  const SEG_BG = {
+    'VC':      '#F1F8E9',
+    'Current': '#E3F2FD',
+    'Early':   '#FFFDE7',
+    'Late31+': '#FBE9E7',
+    'NPL':     '#FCE4EC',
+    'Other':   '#F5F5F5'
+  };
 
+  let tableBody = '';
+
+  if (data.breakdown && data.breakdown.length > 0) {
+    // จัดกลุ่ม breakdown ตาม officer
+    const officerGroups = {};
+    data.breakdown.forEach(row => {
+      if (!officerGroups[row.officer]) officerGroups[row.officer] = [];
+      officerGroups[row.officer].push(row);
+    });
+
+    // เรียง officer ตามลำดับ contacts มากสุด (จาก data.officers)
+    const officerOrder = (data.officers || []).map(o => o.officer);
+    // เพิ่ม officer ที่อาจอยู่ใน breakdown แต่ไม่อยู่ใน officers (ป้องกัน edge case)
+    Object.keys(officerGroups).forEach(name => {
+      if (!officerOrder.includes(name)) officerOrder.push(name);
+    });
+
+    officerOrder.forEach(officerName => {
+      const segRows = officerGroups[officerName];
+      if (!segRows || segRows.length === 0) return;
+      const officerTotal = (data.officers || []).find(o => o.officer === officerName) || {};
+      const isFirstOfficer = tableBody === '';
+
+      segRows.forEach((row, idx) => {
+        const rate = row.success_rate || 0;
+        const bg   = SEG_BG[row.segment] || '#F9F9F9';
+        const borderTop = idx === 0 && !isFirstOfficer
+          ? 'border-top:3px solid #e0d898'
+          : idx === 0 ? 'border-top:1px solid #eee' : '';
+        const officerCell = idx === 0
+          ? `<strong>${escHtml(officerName)}</strong>`
+          : '';
+
+        tableBody += `<tr style="background:${bg};${borderTop}">
+          <td style="vertical-align:top">${officerCell}</td>
+          <td><span style="font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(0,0,0,.08);white-space:nowrap">${escHtml(row.segment)}</span></td>
+          <td style="text-align:center">${row.total_contacts}</td>
+          <td style="text-align:center">${row.successful}</td>
+          <td><div class="kpi-bar-cell">${rate}%<div class="kpi-bar-bg"><div class="kpi-bar-fg" style="width:${Math.min(rate,100)}%"></div></div></div></td>
+          <td style="text-align:center">${row.ptp_count}</td>
+          <td style="text-align:right">${(row.ptp_amount||0).toLocaleString('th-TH')}</td>
+          <td style="text-align:center">${row.cases_closed}</td>
+        </tr>`;
+      });
+
+      // Subtotal รายคน (แสดงเฉพาะเมื่อมีหลาย segment)
+      if (segRows.length > 1) {
+        const oRate = officerTotal.success_rate || 0;
+        tableBody += `<tr style="background:#FFFDE7;font-weight:600;border-top:1px dashed #c8b800">
+          <td colspan="2" style="font-size:12px;color:#7a6900;padding-left:12px">↳ รวม ${escHtml(officerName)}</td>
+          <td style="text-align:center">${officerTotal.total_contacts||0}</td>
+          <td style="text-align:center">${officerTotal.successful||0}</td>
+          <td>${oRate}%</td>
+          <td style="text-align:center">${officerTotal.ptp_count||0}</td>
+          <td style="text-align:right">${(officerTotal.ptp_amount||0).toLocaleString('th-TH')}</td>
+          <td style="text-align:center">${officerTotal.cases_closed||0}</td>
+        </tr>`;
+      }
+    });
+  } else {
+    // Fallback: ยังไม่มี breakdown (backend เก่า)
+    (data.officers || []).forEach(o => {
+      const rate = o.success_rate || 0;
+      tableBody += `<tr>
+        <td colspan="2"><strong>${escHtml(o.officer)}</strong></td>
+        <td style="text-align:center">${o.total_contacts}</td>
+        <td style="text-align:center">${o.successful}</td>
+        <td><div class="kpi-bar-cell">${rate}%<div class="kpi-bar-bg"><div class="kpi-bar-fg" style="width:${Math.min(rate,100)}%"></div></div></div></td>
+        <td style="text-align:center">${o.ptp_count}</td>
+        <td style="text-align:right">${(o.ptp_amount||0).toLocaleString('th-TH')}</td>
+        <td style="text-align:center">${o.cases_closed}</td>
+      </tr>`;
+    });
+  }
+
+  const emptyRow = `<tr><td colspan="8" class="kpi-empty">ยังไม่มีข้อมูลในช่วงนี้</td></tr>`;
   const totalRow = `<tr class="total-row">
-    <td>รวมทั้งหมด</td>
+    <td colspan="2">รวมทีม</td>
     <td style="text-align:center">${t.total_contacts||0}</td>
     <td style="text-align:center">${t.successful||0}</td>
     <td>${t.success_rate||0}%</td>
@@ -838,20 +906,21 @@ function renderKpi(data) {
     <table class="kpi-table">
       <thead><tr>
         <th>Officer</th>
-        <th style="text-align:center">การติดต่อ</th>
+        <th>Segment</th>
+        <th style="text-align:center">ติดต่อ</th>
         <th style="text-align:center">สำเร็จ</th>
-        <th>อัตราสำเร็จ</th>
+        <th>% สำเร็จ</th>
         <th style="text-align:center">นัดชำระ</th>
         <th style="text-align:right">ยอดนัดชำระ</th>
         <th style="text-align:center">เคสปิด</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" class="kpi-empty">ยังไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody>
+      <tbody>${tableBody || emptyRow}</tbody>
       <tfoot>${totalRow}</tfoot>
     </table>`;
 
   document.getElementById('kpiNote').textContent =
     'ข้อมูล: ' + periodLabel + ' | อัปเดต: ' + (data.generated_at || '') +
-    ' | หมายเหตุ: ยอดนัดชำระ = PTP ที่บันทึกใน Comment Log เท่านั้น';
+    ' | หมายเหตุ: สีแต่ละแถว = Segment | ยอดนัดชำระ = PTP ที่บันทึกใน Comment Log';
 }
 window.loadKpi = loadKpi;
 window.savePenalty=savePenalty;
