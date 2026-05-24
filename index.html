@@ -88,6 +88,34 @@
 .risk-escalate{display:inline-block;background:#D93025;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;margin-top:4px}
 .risk-meta{font-size:11px;color:#888;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
 
+/* ── KPI Dashboard Overlay ───────────────────────────── */
+.kpi-view{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.kpi-view.open{display:flex}
+.kpi-box{background:#FFFDF0;border-radius:12px;width:100%;max-width:860px;padding:28px;box-shadow:0 24px 48px -12px rgba(16,24,40,.2)}
+.kpi-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid #FFC400}
+.kpi-title{font-size:18px;font-weight:800;color:#1C1A00}
+.kpi-period-tabs{display:flex;gap:6px}
+.kpi-ptab{padding:6px 16px;border-radius:20px;border:1.5px solid #E8D99A;background:white;font-size:12px;font-weight:600;cursor:pointer;color:#7A6800}
+.kpi-ptab.active{background:#1C1A00;color:#FFC400;border-color:#1C1A00}
+.kpi-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.kpi-stat{background:white;border:1px solid #E8D99A;border-radius:10px;padding:14px 16px}
+.kpi-stat.highlight{background:#1C1A00}
+.kpi-stat-val{font-size:24px;font-weight:800;color:#1C1A00;margin-bottom:2px}
+.kpi-stat.highlight .kpi-stat-val{color:#FFC400}
+.kpi-stat-lbl{font-size:11px;color:#7A6800;text-transform:uppercase;letter-spacing:.05em}
+.kpi-stat.highlight .kpi-stat-lbl{color:rgba(255,255,255,.5)}
+.kpi-table-wrap{background:white;border:1px solid #E8D99A;border-radius:10px;overflow:hidden;margin-bottom:12px}
+.kpi-table{width:100%;border-collapse:collapse;font-size:13px}
+.kpi-table th{background:#1C1A00;color:#FFC400;padding:10px 14px;text-align:left;font-size:12px;font-weight:700}
+.kpi-table td{padding:10px 14px;border-bottom:1px solid #E8D99A}
+.kpi-table tr:last-child td{border-bottom:none}
+.kpi-table tr:hover td{background:#FFFBE6}
+.kpi-table .total-row td{background:#FFFDF0;font-weight:700;border-top:2px solid #E8D99A}
+.kpi-bar-bg{height:6px;background:#e8e0c0;border-radius:3px;overflow:hidden;margin-top:3px}
+.kpi-bar-fg{height:100%;border-radius:3px;background:#1F9D55}
+.kpi-note{font-size:11px;color:#7A6800;text-align:center;margin-top:8px}
+.kpi-empty{text-align:center;padding:40px;color:#888;font-size:13px}
+
 </style><link rel="stylesheet" href="volt-restyle.css">
 </head><body>
 <div class="assign-view" id="assignView">
