@@ -493,33 +493,53 @@ window.handleAssignFile = handleAssignFile;
 window.closeAssignView = closeAssignView;
 window.saveAssignment = saveAssignment;
 window.markAssignChanged = markAssignChanged;
-window.setCustomerNote=setCustomerNote;function setNextCallDate(idx,value){const c=customers[idx];localStorage.setItem('volt_ncd_'+noteKey(c),value)}function setCaseStatus(idx,value){const c=customers[idx];localStorage.setItem('volt_cas_'+noteKey(c),value);renderReviewLayer()}function fetchCommentHistory(idx){
+window.setCustomerNote=setCustomerNote;function setNextCallDate(idx,value){const c=customers[idx];localStorage.setItem('volt_ncd_'+noteKey(c),value)}function setCaseStatus(idx,value){const c=customers[idx];localStorage.setItem('volt_cas_'+noteKey(c),value);renderReviewLayer()}function historyTimestamp(v){const raw=String(v||'').trim();if(!raw)return '-';const d=new Date(raw);if(!Number.isNaN(d.getTime()))return d.toLocaleString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});return raw.replace(/\s*GMT[^\n\r]*/,'').trim()}function historyDate(v){const raw=String(v||'').trim();if(!raw)return '';const d=new Date(raw);if(!Number.isNaN(d.getTime()))return d.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});return raw.replace(/\s*GMT[^\n\r]*/,'').trim()}function fetchCommentHistory(idx){
   const c=customers[idx];
   const voltId=encodeURIComponent(c.id||c.crm_id||'');
   if(!voltId)return;
-  const cb='voltHist_'+idx;
+  const cb='voltHist_'+idx+'_'+Date.now();
   const histBox=document.getElementById('historyBox-'+idx);
+  const btn=document.getElementById('historyBtn-'+idx);
   if(!histBox)return;
   histBox.style.display='block';
-  histBox.innerHTML='<span class="muted">กำลังโหลด...</span>';
+  histBox.innerHTML='<div class="muted" style="padding:6px 0">กำลังโหลดประวัติการติดตาม...</div>';
+  if(btn)btn.textContent='กำลังโหลดประวัติการติดตาม...';
   window[cb]=function(data){
+    if(btn)btn.textContent='ประวัติการติดตามทั้งหมด';
     if(!histBox)return;
-    if(!data||!data.length){histBox.innerHTML='<span class="muted">ยังไม่มีประวัติการสนทนา</span>';return;}
-    histBox.innerHTML=data.map(r=>`
-      <div style="border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:4px">
+    if(!data||!data.length){
+      histBox.innerHTML='<div class="muted" style="padding:6px 0">ยังไม่มีประวัติการติดตามของลูกค้ารายนี้ใน Comment Log</div>';
+      delete window[cb];
+      return;
+    }
+    histBox.innerHTML='<div style="font-weight:700;color:#8B6500;margin-bottom:6px">ประวัติการติดตาม '+data.length+' รายการ</div>'+data.map(r=>{
+      const ptp=Number(String(r.ptp_amount||'').replace(/,/g,''))||0;
+      const meta=[
+        r.contact_status?`ผลติดต่อ: ${escHtml(r.contact_status)}`:'',
+        ptp?`PTP: ${money(ptp)}${r.ptp_date?' | '+escHtml(historyDate(r.ptp_date)):''}`:'',
+        r.next_call_date?`โทรถัดไป: ${escHtml(historyDate(r.next_call_date))}`:'',
+        r.case_status?`สถานะเคส: ${escHtml(r.case_status)}`:''
+      ].filter(Boolean).join(' · ');
+      return `<div style="border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:4px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:3px">
-          <b>${escHtml(r.timestamp)}</b> | ${escHtml(r.comment_by)}
-          ${r.contact_status?'<span style="background:#FFC400;color:#1C1A00;border-radius:4px;padding:1px 6px;margin-left:4px;font-size:10px">'+escHtml(r.contact_status)+'</span>':''}
+          <b>${escHtml(historyTimestamp(r.timestamp))}</b> | ${escHtml(r.comment_by||'-')}
+          ${r.status?'<span style="background:#FFC400;color:#1C1A00;border-radius:4px;padding:1px 6px;margin-left:4px;font-size:10px">'+escHtml(r.status)+'</span>':''}
         </div>
-        <div style="font-size:13px;color:var(--text)">${escHtml(r.comment||'-')}</div>
-        ${r.ptp_amount&&r.ptp_amount!='0'?'<div style="font-size:11px;color:#1f9d55;margin-top:2px">💰 PTP '+escHtml(r.ptp_amount)+' | '+escHtml(r.ptp_date)+'</div>':''}
-      </div>`).join('');
+        <div style="font-size:13px;color:var(--text);white-space:pre-wrap">${escHtml(r.comment||'-')}</div>
+        ${meta?'<div style="font-size:11px;color:#1f6f43;margin-top:4px">'+meta+'</div>':''}
+      </div>`;
+    }).join('');
     delete window[cb];
   };
   const s=document.createElement('script');
-  s.src=COMMENT_SUBMIT_URL.replace('/exec','/exec')+'?action=history&volt_id='+voltId+'&callback='+cb;
+  s.src=COMMENT_SUBMIT_URL+'?action=history&volt_id='+voltId+'&callback='+cb;
+  s.onerror=function(){
+    if(btn)btn.textContent='ประวัติการติดตามทั้งหมด';
+    histBox.innerHTML='<div class="muted" style="padding:6px 0">โหลดประวัติไม่สำเร็จ กรุณาลองใหม่หรือเปิด Comment Log</div>';
+    delete window[cb];
+  };
   document.head.appendChild(s);
-  setTimeout(()=>{delete window[cb];},8000);
+  setTimeout(()=>{if(window[cb]){if(btn)btn.textContent='ประวัติการติดตามทั้งหมด';histBox.innerHTML='<div class="muted" style="padding:6px 0">โหลดประวัติไม่สำเร็จ กรุณาลองใหม่หรือเปิด Comment Log</div>';delete window[cb];}},10000);
 }
 window.fetchCommentHistory=fetchCommentHistory;
 function todayISO(){return new Date().toISOString().slice(0,10)}
@@ -676,8 +696,8 @@ window.setContactStatus=setContactStatus;window.setPtpAmount=setPtpAmount;window
 <button type="button" onclick="toggleMgrEdit(${c.idx})" id="mgrEditBtn-${c.idx}" style="font-size:11px;color:#8B6500;background:none;border:1px solid #C49000;border-radius:4px;padding:2px 10px;cursor:pointer">✏️ แก้ไข</button>
 <button type="button" onclick="saveMgrNoteRemote(${c.idx})" id="mgrSaveBtn-${c.idx}" style="font-size:11px;color:white;background:#C49000;border:none;border-radius:4px;padding:2px 10px;cursor:pointer;display:none">บันทึก</button>
 </div>
-</div><button class="btn" type="button" onclick="fetchCommentHistory(${c.idx})" style="margin-bottom:8px;width:100%;text-align:left">🕐 ดูประวัติการสนทนาทั้งหมด</button>
-<div id="historyBox-${c.idx}" style="display:none;max-height:200px;overflow-y:auto;background:#f9f3d0;border-radius:6px;padding:8px;margin-bottom:8px;font-size:12px"></div>
+</div><button class="btn" id="historyBtn-${c.idx}" type="button" onclick="fetchCommentHistory(${c.idx})" style="margin-bottom:8px;width:100%;text-align:left;background:#1C1A00;color:#FFC400;border-color:#1C1A00;font-weight:700;display:flex;align-items:center;gap:8px;justify-content:flex-start"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#FFC400;color:#1C1A00;font-size:12px;line-height:1">↺</span><span>ประวัติการติดตามทั้งหมด</span></button>
+<div id="historyBox-${c.idx}" style="display:none;max-height:260px;overflow-y:auto;background:#f9f3d0;border:1px solid #e8d99a;border-radius:6px;padding:8px;margin-bottom:8px;font-size:12px"></div>
 <label>Comment by</label><input id="commentBy-${c.idx}" type="text" placeholder="ชื่อผู้ติดตาม / ทีม" value="${localStorage.getItem('volt_comment_by')||''}" oninput="setCommentBy(${c.idx}, this.value)" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:12px;margin-bottom:6px"><div class="field-section-label">📞 ต้องกรอก</div><div class="field-required"><label>ผลการติดต่อ</label><select id="contactStatus-${c.idx}" onchange="setContactStatus(${c.idx}, this.value)" style="width:100%;border:1px solid #b8cff5;border-radius:6px;padding:7px 8px;font-size:12px;background:white"><option value="" ${(loadNotes()[noteKey(c)]||{}).contact_status===''||!(loadNotes()[noteKey(c)]||{}).contact_status?'selected':''}>-- เลือกผลการติดต่อ --</option><optgroup label="ติดต่อได้"><option value="ติดต่อได้ - รับสาย">ติดต่อได้ - รับสาย</option><option value="ติดต่อได้ - นัดชำระ">ติดต่อได้ - นัดชำระ</option></optgroup><optgroup label="ติดต่อไม่ได้"><option value="ติดต่อไม่ได้ - ไม่รับสาย">ติดต่อไม่ได้ - ไม่รับสาย</option><option value="ติดต่อไม่ได้ - ปิดเครื่อง">ติดต่อไม่ได้ - ปิดเครื่อง</option><option value="ติดต่อไม่ได้ - บล็อกเบอร์">ติดต่อไม่ได้ - บล็อกเบอร์</option><option value="ติดต่อไม่ได้ - เปลี่ยนเบอร์">ติดต่อไม่ได้ - เปลี่ยนเบอร์</option><option value="ติดต่อไม่ได้ - เบอร์ไม่ถูกต้อง">ติดต่อไม่ได้ - เบอร์ไม่ถูกต้อง</option></optgroup></select></div><div class="field-section-label">📝 ข้อมูลเพิ่มเติม (ถ้ามี)</div><div class="field-optional"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px"><div><label>PTP Amount (ถ้ามี)</label><input id="ptpAmount-${c.idx}" type="number" min="0" step="0.01" placeholder="0.00" oninput="setPtpAmount(${c.idx}, this.value)" value="${localStorage.getItem('volt_pta_'+noteKey(c))||''}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:12px;background:white"></div><div><label>PTP Date (ถ้ามี)</label><input id="ptpDate-${c.idx}" type="date" oninput="setPtpDate(${c.idx}, this.value)" value="${localStorage.getItem('volt_ptd_'+noteKey(c))||''}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:12px;background:white"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><div><label>วันโทรครั้งถัดไป</label><input id="nextCallDate-${c.idx}" type="date" oninput="setNextCallDate(${c.idx}, this.value)" value="${localStorage.getItem('volt_ncd_'+noteKey(c))||''}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:12px;background:white"></div><div><label>สถานะเคส</label><select id="caseStatus-${c.idx}" onchange="setCaseStatus(${c.idx}, this.value)" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:12px;background:white"><option value="">-- เลือก --</option><option value="ยังติดตามอยู่">ยังติดตามอยู่</option><option value="มีปัญหาการใช้งาน">มีปัญหาการใช้งาน</option><option value="มีปัญหาการติดตั้ง">มีปัญหาการติดตั้ง</option><option value="ลูกค้าแจ้งให้รื้อคืน">ลูกค้าแจ้งให้รื้อคืน</option><option value="ส่งฝ่ายกฎหมาย">ส่งฝ่ายกฎหมาย</option><option value="แก้ไขแล้ว / ชำระครบ">แก้ไขแล้ว / ชำระครบ</option></select></div></div></div><div class="field-required"><label>คอมเม้นท์ / บันทึก</label><textarea rows="4" placeholder="พิมพ์ note สำหรับติดตามหนี้..." oninput="setCustomerNote(${c.idx}, this.value)">${saved.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}</textarea><div class="comment-status" id="commentStatus-${c.idx}">${saved?'มี note ที่บันทึกไว้ใน browser':'note นี้ยังอยู่ใน browser จนกว่าจะกด Submit to Comment Log'}</div></div></div><div class="note"><b>Collection Context</b><br>DC Status: ${c.dc_status||'-'}<br>DC Comment: ${c.dc_comment||'-'}<br>NPL Type: ${c.npl_type||'-'}<br>${c.customer_comment||''}<br>Phone: ${c.phone||'-'}<br>VOLT ID: ${c.id}<br>CRM ID: ${c.crm_id||'-'}<br>Portfolio: ${c.portfolio_type}<br>Source row: ${c.source_row}</div><div class="detail-actions">${telLink}${mapLink}<button class="btn primary" type="button" onclick="submitComment(${c.idx})">Submit to Comment Log</button></div>${opsPanels(c)}</div>`}function openCustomerModal(idx) {
   const c = customers[idx];
   if (!c) return;

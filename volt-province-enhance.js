@@ -110,3 +110,177 @@
     init();
   }
 })();
+
+/* ============================================================
+   Follow-up history UI override
+   Keeps the existing index.html compatible while making the
+   customer history button and timeline cleaner.
+   ============================================================ */
+(function () {
+  function escHtml(v) {
+    return String(v ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
+  }
+
+  function money(n) {
+    return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+
+  function shortTimestamp(v) {
+    const raw = String(v || '').trim();
+    if (!raw) return '-';
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleString('th-TH', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    return raw.replace(/\s*GMT[^\n\r]*/, '').trim();
+  }
+
+  function shortDate(v) {
+    const raw = String(v || '').trim();
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString('th-TH', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+    return raw.replace(/\s*GMT[^\n\r]*/, '').trim();
+  }
+
+  function styleHistoryButton(btn) {
+    if (!btn) return;
+    btn.innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#FFC400;color:#1C1A00;font-size:12px;line-height:1">↺</span><span>ประวัติการติดตามทั้งหมด</span>';
+    btn.style.background = '#1C1A00';
+    btn.style.color = '#FFC400';
+    btn.style.borderColor = '#1C1A00';
+    btn.style.fontWeight = '700';
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+    btn.style.gap = '8px';
+    btn.style.justifyContent = 'flex-start';
+  }
+
+  function styleHistoryBox(box) {
+    if (!box) return;
+    box.style.maxHeight = '260px';
+    box.style.border = '1px solid #e8d99a';
+    box.style.borderRadius = '6px';
+  }
+
+  function enhanceOpenCustomerDetail() {
+    document.querySelectorAll('[id^="historyBox-"]').forEach(styleHistoryBox);
+    document.querySelectorAll('button[onclick^="fetchCommentHistory"]').forEach(function (btn) {
+      if (!btn.id) {
+        const m = btn.getAttribute('onclick').match(/fetchCommentHistory\((\d+)\)/);
+        if (m) btn.id = 'historyBtn-' + m[1];
+      }
+      styleHistoryButton(btn);
+    });
+  }
+
+  function getCustomers() {
+    if (typeof customers !== 'undefined' && Array.isArray(customers)) return customers;
+    try {
+      return JSON.parse(document.getElementById('customer-data')?.textContent || '[]');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  const originalOpenCustomerModal = window.openCustomerModal;
+  if (typeof originalOpenCustomerModal === 'function') {
+    window.openCustomerModal = function () {
+      const result = originalOpenCustomerModal.apply(this, arguments);
+      setTimeout(enhanceOpenCustomerDetail, 0);
+      return result;
+    };
+  }
+
+  const originalToggleCustomerDetail = window.toggleCustomerDetail;
+  if (typeof originalToggleCustomerDetail === 'function') {
+    window.toggleCustomerDetail = function () {
+      const result = originalToggleCustomerDetail.apply(this, arguments);
+      setTimeout(enhanceOpenCustomerDetail, 0);
+      return result;
+    };
+  }
+
+  if (window.COMMENT_SUBMIT_URL || typeof COMMENT_SUBMIT_URL !== 'undefined') {
+    window.fetchCommentHistory = function (idx) {
+      const customerRows = getCustomers();
+      const c = customerRows[idx];
+      if (!c) return;
+      const endpoint = window.COMMENT_SUBMIT_URL || COMMENT_SUBMIT_URL;
+      const voltId = encodeURIComponent(c.id || c.crm_id || '');
+      if (!voltId || !endpoint) return;
+
+      const cb = 'voltHist_' + idx + '_' + Date.now();
+      const histBox = document.getElementById('historyBox-' + idx);
+      const btn = document.getElementById('historyBtn-' + idx);
+      if (!histBox) return;
+
+      styleHistoryButton(btn);
+      styleHistoryBox(histBox);
+      histBox.style.display = 'block';
+      histBox.innerHTML = '<div class="muted" style="padding:6px 0">กำลังโหลดประวัติการติดตาม...</div>';
+      if (btn) btn.textContent = 'กำลังโหลดประวัติการติดตาม...';
+
+      window[cb] = function (data) {
+        styleHistoryButton(btn);
+        if (!histBox) return;
+        if (!data || !data.length) {
+          histBox.innerHTML = '<div class="muted" style="padding:6px 0">ยังไม่มีประวัติการติดตามของลูกค้ารายนี้ใน Comment Log</div>';
+          delete window[cb];
+          return;
+        }
+        histBox.innerHTML = '<div style="font-weight:700;color:#8B6500;margin-bottom:6px">ประวัติการติดตาม ' + data.length + ' รายการ</div>' + data.map(function (r) {
+          const ptp = Number(String(r.ptp_amount || '').replace(/,/g, '')) || 0;
+          const meta = [
+            r.contact_status ? 'ผลติดต่อ: ' + escHtml(r.contact_status) : '',
+            ptp ? 'PTP: ' + money(ptp) + (r.ptp_date ? ' | ' + escHtml(shortDate(r.ptp_date)) : '') : '',
+            r.next_call_date ? 'โทรถัดไป: ' + escHtml(shortDate(r.next_call_date)) : '',
+            r.case_status ? 'สถานะเคส: ' + escHtml(r.case_status) : ''
+          ].filter(Boolean).join(' · ');
+          return '<div style="border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:4px">'
+            + '<div style="font-size:11px;color:var(--muted);margin-bottom:3px">'
+            + '<b>' + escHtml(shortTimestamp(r.timestamp)) + '</b> | ' + escHtml(r.comment_by || '-')
+            + (r.status ? '<span style="background:#FFC400;color:#1C1A00;border-radius:4px;padding:1px 6px;margin-left:4px;font-size:10px">' + escHtml(r.status) + '</span>' : '')
+            + '</div>'
+            + '<div style="font-size:13px;color:var(--text);white-space:pre-wrap">' + escHtml(r.comment || '-') + '</div>'
+            + (meta ? '<div style="font-size:11px;color:#1f6f43;margin-top:4px">' + meta + '</div>' : '')
+            + '</div>';
+        }).join('');
+        delete window[cb];
+      };
+
+      const s = document.createElement('script');
+      s.src = endpoint + '?action=history&volt_id=' + voltId + '&callback=' + cb;
+      s.onerror = function () {
+        styleHistoryButton(btn);
+        histBox.innerHTML = '<div class="muted" style="padding:6px 0">โหลดประวัติไม่สำเร็จ กรุณาลองใหม่หรือเปิด Comment Log</div>';
+        delete window[cb];
+      };
+      document.head.appendChild(s);
+      setTimeout(function () {
+        if (window[cb]) {
+          styleHistoryButton(btn);
+          histBox.innerHTML = '<div class="muted" style="padding:6px 0">โหลดประวัติไม่สำเร็จ กรุณาลองใหม่หรือเปิด Comment Log</div>';
+          delete window[cb];
+        }
+      }, 10000);
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', enhanceOpenCustomerDetail);
+})();
