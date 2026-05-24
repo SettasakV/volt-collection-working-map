@@ -926,6 +926,18 @@ window.loadKpi = loadKpi;
 window.savePenalty=savePenalty;
 window.saveRestructure=saveRestructure;
 
+// ─── บันทึก KPI รายคน (manual) ────────────────────────────────────────
+function saveActivitySnapshotNow() {
+  const btn = event && event.target ? event.target : null;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...'; }
+  postToScript_({ action: 'save_activity_snapshot_now' }, 'actSnapFrame');
+  setTimeout(() => {
+    if (btn) { btn.disabled = false; btn.textContent = '📋 บันทึก KPI รายคน'; }
+    alert('✅ บันทึก KPI รายคนเสร็จแล้ว!\nดูข้อมูลได้ใน Google Sheet แถบ kpi_activity_snapshot');
+  }, 3000);
+}
+window.saveActivitySnapshotNow = saveActivitySnapshotNow;
+
 function setAssignFilter(name){
   activeAssignFilter = name || null;
   renderAssignFilterBar();
@@ -1004,7 +1016,17 @@ window.addEventListener('load',()=>{initMap();loadLatestComments();renderReviewL
     <div id="kpiTableWrap" class="kpi-table-wrap">
       <div class="kpi-empty" style="padding:40px;text-align:center;color:#888">กำลังโหลด...</div>
     </div>
-    <div class="kpi-note" id="kpiNote"></div><div style="text-align:center;margin-top:10px"><button onclick="savePortfolioSnapshot()" style="background:#1C1A00;color:#FFC400;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;">📸 บันทึก Portfolio Snapshot</button><span style="font-size:10px;color:#7A6800;display:block;margin-top:4px">กดหลังจาก refresh data.json ทุกครั้ง เพื่อบันทึกสถานะ portfolio ลง Google Sheet</span></div>
+    <div class="kpi-note" id="kpiNote"></div>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px">
+      <div style="text-align:center">
+        <button onclick="saveActivitySnapshotNow()" style="background:#1C1A00;color:#FFC400;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;">📋 บันทึก KPI รายคน</button>
+        <span style="font-size:10px;color:#7A6800;display:block;margin-top:4px">กดทุกสัปดาห์หรือสิ้นเดือน — บันทึกผลงานรายคน+segment ลง Google Sheet</span>
+      </div>
+      <div style="text-align:center">
+        <button onclick="savePortfolioSnapshot()" style="background:#4A4800;color:#FFC400;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;">📸 บันทึก Portfolio Snapshot</button>
+        <span style="font-size:10px;color:#7A6800;display:block;margin-top:4px">กดหลัง refresh data.json — บันทึกภาพรวม portfolio ลง Google Sheet</span>
+      </div>
+    </div>
   </div>
 </div>
 </body></html>
