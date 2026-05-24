@@ -730,14 +730,17 @@ function saveRestructure(idx){
 
 function closeKpiView(){
   const v=document.getElementById('kpiView');
-  if(v) v.style.display='none';
+  if(v) v.classList.remove('open');
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  const mapNav=document.getElementById('nav-map');
+  if(mapNav) mapNav.classList.add('active');
 }
 window.closeKpiView=closeKpiView;
 
 function loadKpi(period, btnEl) {
   // เปิด overlay
   const v=document.getElementById('kpiView');
-  if(v) v.style.display='flex';
+  if(v) v.classList.add('open');
   // อัปเดต active tab
   document.querySelectorAll('.kpi-ptab').forEach(b => b.classList.remove('active'));
   if (btnEl) btnEl.classList.add('active');
@@ -895,8 +898,8 @@ function toggleAcc(hdr){var b=hdr.nextElementSibling;var o=b.style.display!=='no
 window.addEventListener('load',()=>{initMap();loadLatestComments();renderReviewLayer();loadAssignData();});
 </script><script src="volt-province-enhance.js" defer></script>
 
-<div id="kpiView" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">
-  <div class="kpi-box">
+<div class="assign-view" id="kpiView">
+  <div class="assign-box" style="max-width:860px;background:#FFFDF0">
     <div class="kpi-header">
       <div class="kpi-title">📊 KPI Dashboard — ผลงานทีม Collection</div>
       <div style="display:flex;gap:8px;align-items:center">
