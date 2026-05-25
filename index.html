@@ -321,52 +321,64 @@ function closeAssignView() {
 }
 
 function loadAssignData() {
-  const cb1 = 'voltAssign_' + Date.now();
-  // Default team members (fallback ถ้า Apps Script ยังไม่ตอบ)
   const DEFAULT_TEAM = ["settasak", "collection1", "coleection2"];
-  const cb2 = 'voltTeam_' + Date.now();
-  // โหลด cache จาก localStorage ก่อนเพื่อให้เห็นทันที
-  const _cached = localStorage.getItem('volt_assignments_cache');
-  if (_cached) {
-    try {
-      assignData = sanitizeAssignmentData(JSON.parse(_cached));
-      renderAssignFilterBar();
-      setTimeout(()=>rebuild(), 100); // render รายการพร้อม badge
-    } catch(e) {}
-  }
+  const countEl = document.getElementById('assignCount');
+  if (countEl) countEl.textContent = 'กำลังโหลดทีม...';
+  assignLoaded = false;
 
-  window[cb1] = function(data) {
-    assignData = sanitizeAssignmentData(data || {});
-    // บันทึก cache ไว้ใน localStorage
-    try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
-    delete window[cb1];
-    if (!teamMembers.length) { teamMembers = sanitizeTeamMembers(DEFAULT_TEAM); populateTeamDropdown(); }
-    assignLoaded = true;
-    renderAssignTable();
-    renderAssignFilterBar();
-    rebuild(); // re-render รายการพร้อม assignment tags
-  };
-  window[cb2] = function(data) {
-    teamMembers = sanitizeTeamMembers((data && data.length) ? data : DEFAULT_TEAM);
-    assignData = sanitizeAssignmentData(assignData);
-    try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
+  const finishTeamLoad = function(names) {
+    teamMembers = sanitizeTeamMembers((names && names.length) ? names : DEFAULT_TEAM);
     populateTeamDropdown();
+    assignData = loadAssignmentCacheForCurrentTeam();
     renderAssignTable();
     renderAssignFilterBar();
     rebuild();
-    delete window[cb2];
+    loadAssignmentsFromBackend();
   };
-  // Timeout fallback
-  setTimeout(() => {
-    if (!teamMembers.length) { teamMembers = sanitizeTeamMembers(DEFAULT_TEAM); populateTeamDropdown(); }
-    if (!assignLoaded) { assignLoaded = true; renderAssignTable(); renderAssignFilterBar(); rebuild(); }
-  }, 4000);
-  const s1 = document.createElement('script');
-  s1.src = COMMENT_SUBMIT_URL + '?action=get_assignments&callback=' + cb1;
-  document.head.appendChild(s1);
+
+  const cbTeam = 'voltTeam_' + Date.now();
+  let teamDone = false;
+  window[cbTeam] = function(data) {
+    if (teamDone) return;
+    teamDone = true;
+    delete window[cbTeam];
+    finishTeamLoad(data);
+  };
   const s2 = document.createElement('script');
-  s2.src = COMMENT_SUBMIT_URL + '?action=get_team&callback=' + cb2;
+  s2.src = COMMENT_SUBMIT_URL + '?action=get_team&callback=' + cbTeam;
   document.head.appendChild(s2);
+  setTimeout(() => {
+    if (teamDone) return;
+    teamDone = true;
+    delete window[cbTeam];
+    finishTeamLoad(DEFAULT_TEAM);
+  }, 4000);
+}
+
+function loadAssignmentsFromBackend(){
+  const cbAssign = 'voltAssign_' + Date.now();
+  const countEl = document.getElementById('assignCount');
+  if (countEl) countEl.textContent = 'กำลังโหลด assignment...';
+  window[cbAssign] = function(data) {
+    delete window[cbAssign];
+    assignData = sanitizeAssignmentData(data || {});
+    saveAssignmentCacheForCurrentTeam();
+    assignLoaded = true;
+    renderAssignTable();
+    renderAssignFilterBar();
+    rebuild();
+  };
+  const s1 = document.createElement('script');
+  s1.src = COMMENT_SUBMIT_URL + '?action=get_assignments&callback=' + cbAssign;
+  document.head.appendChild(s1);
+  setTimeout(() => {
+    if (!window[cbAssign]) return;
+    delete window[cbAssign];
+    assignLoaded = true;
+    renderAssignTable();
+    renderAssignFilterBar();
+    rebuild();
+  }, 8000);
 }
 
 function populateTeamDropdown() {
@@ -394,20 +406,39 @@ function sanitizeAssignmentData(data){
   return result;
 }
 
-function renderAssignTable() {
-  const filterStatus = document.getElementById('assignFilterStatus').value;
-  const filterPerson = document.getElementById('assignFilterPerson').value;
-  const search = (document.getElementById('assignSearch').value || '').toLowerCase();
-  const statusOrder = {NPL:0, Late:1, Current:2, 'Not Installed':3};
+function assignmentTeamSignature(){
+  return currentTeamMembers().map(normalizeOfficerName).sort().join('|');
+}
 
-  let list = customers.filter(c => {
-    if (filterStatus && c.status !== filterStatus) return false;
-    const asgn = assignData[c.id] || {};
-    if (filterPerson === '__none__' && asgn.assigned_to) return false;
-    if (filterPerson && filterPerson !== '__none__' && normalizeOfficerName(asgn.assigned_to) !== normalizeOfficerName(filterPerson)) return false;
-    if (search && !c.name.toLowerCase().includes(search) && !c.id.toLowerCase().includes(search)) return false;
-    return true;
-  }).sort((a,b) => (statusOrder[a.status]||9) - (statusOrder[b.status]||9) || (b.days_late||0) - (a.days_late||0));
+function loadAssignmentCacheForCurrentTeam(){
+  try {
+    const raw = localStorage.getItem('volt_assignments_cache_v2');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.team_signature === assignmentTeamSignature()) {
+        return sanitizeAssignmentData(parsed.assignments || {});
+      }
+    }
+    const legacy = localStorage.getItem('volt_assignments_cache');
+    return legacy ? sanitizeAssignmentData(JSON.parse(legacy)) : {};
+  } catch(e) {
+    return {};
+  }
+}
+
+function saveAssignmentCacheForCurrentTeam(){
+  try {
+    localStorage.setItem('volt_assignments_cache_v2', JSON.stringify({
+      team_signature: assignmentTeamSignature(),
+      saved_at: new Date().toISOString(),
+      assignments: sanitizeAssignmentData(assignData)
+    }));
+    localStorage.setItem('volt_assignments_cache', JSON.stringify(sanitizeAssignmentData(assignData)));
+  } catch(e) {}
+}
+
+function renderAssignTable() {
+  const list = getFilteredAssignCustomers();
 
   document.getElementById('assignCount').textContent = list.length + ' ราย';
 
@@ -436,6 +467,21 @@ function renderAssignTable() {
   }).join('');
 }
 
+function getFilteredAssignCustomers(){
+  const filterStatus = document.getElementById('assignFilterStatus').value;
+  const filterPerson = document.getElementById('assignFilterPerson').value;
+  const search = (document.getElementById('assignSearch').value || '').toLowerCase();
+  const statusOrder = {NPL:0, Late:1, Current:2, 'Not Installed':3};
+  return customers.filter(c => {
+    if (filterStatus && c.status !== filterStatus) return false;
+    const asgn = assignData[c.id] || {};
+    if (filterPerson === '__none__' && asgn.assigned_to) return false;
+    if (filterPerson && filterPerson !== '__none__' && normalizeOfficerName(asgn.assigned_to) !== normalizeOfficerName(filterPerson)) return false;
+    if (search && !String(c.name||'').toLowerCase().includes(search) && !String(c.id||'').toLowerCase().includes(search)) return false;
+    return true;
+  }).sort((a,b) => (statusOrder[a.status]||9) - (statusOrder[b.status]||9) || (b.days_late||0) - (a.days_late||0));
+}
+
 function markAssignChanged(idx) {
   const saved = document.getElementById('asaved-' + idx);
   if (saved) saved.style.display = 'none';
@@ -457,19 +503,22 @@ function handleAssignFile(input) {
     const assignIdx = headers.indexOf('assigned_to');
     if (voltIdx < 0 || assignIdx < 0) { status.textContent = '❌ ไม่พบ column volt_id หรือ assigned_to'; return; }
     const rows = [];
+    let skipped = 0;
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',').map(c => c.trim().replace(/['"]/g,''));
+      const cols = parseCsvLine(lines[i]);
       const voltId = cols[voltIdx]; const assignedTo = cols[assignIdx];
       const match = currentTeamMembers().find(m => normalizeOfficerName(m) === normalizeOfficerName(assignedTo));
       if (voltId && match) rows.push({volt_id: voltId, assigned_to: match});
+      else skipped++;
     }
-    status.textContent = 'กำลัง import ' + rows.length + ' รายการ...';
+    status.textContent = 'กำลัง import ' + rows.length + ' รายการ' + (skipped ? ' | ข้าม ' + skipped + ' รายการที่ชื่อไม่อยู่ใน Team' : '') + '...';
     let done = 0;
     rows.forEach(row => {
+      const c = customers.find(x => x.id === row.volt_id) || {id:row.volt_id};
       ensureCommentFrame();
       const form = document.createElement('form');
       form.method='POST'; form.action=COMMENT_SUBMIT_URL; form.target='commentSubmitFrame';
-      [['action','save_assignment'],['volt_id',row.volt_id],['assigned_to',row.assigned_to],['assigned_by','import']].forEach(([k,v])=>{
+      assignmentPayloadFields(c, row.assigned_to, 'import').forEach(([k,v])=>{
         const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);
       });
       document.body.appendChild(form); form.submit(); document.body.removeChild(form);
@@ -477,11 +526,40 @@ function handleAssignFile(input) {
       done++;
     });
     setTimeout(() => {
-      status.textContent = '✅ Import ' + done + ' รายการสำเร็จ';
+      assignData = sanitizeAssignmentData(assignData);
+      saveAssignmentCacheForCurrentTeam();
+      status.textContent = 'ส่ง import แล้ว ' + done + ' รายการ' + (skipped ? ' | ข้าม ' + skipped + ' รายการ' : '') + ' — กด Refresh เพื่อตรวจจาก backend';
       renderAssignTable();
     }, 1500);
   };
   reader.readAsText(file, 'UTF-8');
+}
+
+function parseCsvLine(line){
+  const out=[];let cur='';let inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'&&line[i+1]==='"'){cur+='"';i++;continue}
+    if(ch==='"'){inQ=!inQ;continue}
+    if(ch===','&&!inQ){out.push(cur.trim());cur='';continue}
+    cur+=ch;
+  }
+  out.push(cur.trim());
+  return out.map(v=>v.replace(/^['"]|['"]$/g,''));
+}
+
+function assignmentPayloadFields(c, assignedTo, assignedBy){
+  return [
+    ['action','save_assignment'],
+    ['volt_id',c.id||''],
+    ['customer_name',c.name||''],
+    ['segment',deriveSegment_(c)],
+    ['bucket_at_time',c.bucket||''],
+    ['overdue_at_time',c.overdue||0],
+    ['assigned_to',assignedTo||''],
+    ['assigned_by',assignedBy||'Manager'],
+    ['note',assignedTo ? 'manual assignment' : 'manual unassign']
+  ];
 }
 
 function saveAssignment(idx) {
@@ -489,10 +567,12 @@ function saveAssignment(idx) {
   const sel = document.getElementById('asel-' + idx);
   const assignedTo = sel ? sel.value : '';
   const commentBy = commentByValue(idx) || 'Manager';
+  const saved = document.getElementById('asaved-' + idx);
+  if (saved) { saved.style.display = 'inline'; saved.textContent = 'ส่งแล้ว'; }
   ensureCommentFrame();
   const form = document.createElement('form');
   form.method = 'POST'; form.action = COMMENT_SUBMIT_URL; form.target = 'commentSubmitFrame';
-  [['action','save_assignment'],['volt_id',c.id||''],['assigned_to',assignedTo],['assigned_by',commentBy]].forEach(([k,v]) => {
+  assignmentPayloadFields(c, assignedTo, commentBy).forEach(([k,v]) => {
     const i = document.createElement('input'); i.type='hidden'; i.name=k; i.value=v; form.appendChild(i);
   });
   document.body.appendChild(form); form.submit(); document.body.removeChild(form);
@@ -500,11 +580,13 @@ function saveAssignment(idx) {
   assignData[c.id] = assignData[c.id] || {};
   assignData[c.id].assigned_to = assignedTo;
   assignData = sanitizeAssignmentData(assignData);
-  try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
+  saveAssignmentCacheForCurrentTeam();
+  renderAssignFilterBar();
+  rebuild();
   setTimeout(() => {
-    const saved = document.getElementById('asaved-' + idx);
-    if (saved) { saved.style.display = 'inline'; }
-  }, 1200);
+    if (saved) { saved.textContent = 'รอ sync'; }
+    loadAssignmentsFromBackend();
+  }, 1500);
 }
 
 window.openAssignView = openAssignView;
@@ -1069,21 +1151,29 @@ function renderAssignFilterBar(){
 
 function autoSplitAssign(){
   const members = currentTeamMembers();
-  const confirmed = confirm('แบ่งงานให้ '+members.join(' และ ')+' เท่าๆกัน?\nลูกค้าทั้งหมด '+customers.length+' ราย');
+  const scope = getFilteredAssignCustomers();
+  if(!members.length){alert('ยังไม่มีรายชื่อ Team สำหรับแบ่งงาน');return}
+  if(!scope.length){alert('ไม่มีรายการใน scope ปัจจุบันสำหรับแบ่งงาน');return}
+  const confirmed = confirm('แบ่งงานอัตโนมัติให้ '+members.join(' / ')+'\nScope ปัจจุบัน: '+scope.length+' ราย\n\nระบบจะเขียนทับ Assignment ปัจจุบันของรายการใน scope นี้เท่านั้น และบันทึก history ทุกเคส\nยืนยันหรือไม่?');
   if(!confirmed) return;
-  const voltIds = customers.map(c => c.id);
+  const voltIds = scope.map(c => c.id);
   const payload = {
     action: 'auto_assign',
     volt_ids: JSON.stringify(voltIds),
     members:  JSON.stringify(members),
-    assigned_by: localStorage.getItem('volt_comment_by') || 'system'
+    assigned_by: localStorage.getItem('volt_comment_by') || 'system',
+    customer_names: JSON.stringify(scope.map(c => c.name || '')),
+    segments: JSON.stringify(scope.map(c => deriveSegment_(c))),
+    buckets: JSON.stringify(scope.map(c => c.bucket || '')),
+    overdues: JSON.stringify(scope.map(c => Number(c.overdue || 0)))
   };
   // บันทึก assignment ลง localStorage ทันทีก่อน POST
   voltIds.forEach((id, i) => {
     assignData[id] = assignData[id] || {};
     assignData[id].assigned_to = members[i % members.length];
   });
-  try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
+  assignData = sanitizeAssignmentData(assignData);
+  saveAssignmentCacheForCurrentTeam();
   renderAssignFilterBar();
   rebuild();
 
