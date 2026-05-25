@@ -329,14 +329,14 @@ function loadAssignData() {
   const _cached = localStorage.getItem('volt_assignments_cache');
   if (_cached) {
     try {
-      assignData = JSON.parse(_cached);
+      assignData = sanitizeAssignmentData(JSON.parse(_cached));
       renderAssignFilterBar();
       setTimeout(()=>rebuild(), 100); // render รายการพร้อม badge
     } catch(e) {}
   }
 
   window[cb1] = function(data) {
-    assignData = data || {};
+    assignData = sanitizeAssignmentData(data || {});
     // บันทึก cache ไว้ใน localStorage
     try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
     delete window[cb1];
@@ -348,7 +348,12 @@ function loadAssignData() {
   };
   window[cb2] = function(data) {
     teamMembers = sanitizeTeamMembers((data && data.length) ? data : DEFAULT_TEAM);
+    assignData = sanitizeAssignmentData(assignData);
+    try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
     populateTeamDropdown();
+    renderAssignTable();
+    renderAssignFilterBar();
+    rebuild();
     delete window[cb2];
   };
   // Timeout fallback
@@ -376,6 +381,19 @@ function populateTeamDropdown() {
   });
 }
 
+function sanitizeAssignmentData(data){
+  const result = {};
+  const team = currentTeamMembers();
+  Object.entries(data || {}).forEach(([voltId, rec]) => {
+    const assignedTo = rec && rec.assigned_to ? String(rec.assigned_to).trim() : '';
+    if (!assignedTo) return;
+    const match = team.find(m => normalizeOfficerName(m) === normalizeOfficerName(assignedTo));
+    if (!match) return;
+    result[voltId] = Object.assign({}, rec, {assigned_to: match});
+  });
+  return result;
+}
+
 function renderAssignTable() {
   const filterStatus = document.getElementById('assignFilterStatus').value;
   const filterPerson = document.getElementById('assignFilterPerson').value;
@@ -386,7 +404,7 @@ function renderAssignTable() {
     if (filterStatus && c.status !== filterStatus) return false;
     const asgn = assignData[c.id] || {};
     if (filterPerson === '__none__' && asgn.assigned_to) return false;
-    if (filterPerson && filterPerson !== '__none__' && asgn.assigned_to !== filterPerson) return false;
+    if (filterPerson && filterPerson !== '__none__' && normalizeOfficerName(asgn.assigned_to) !== normalizeOfficerName(filterPerson)) return false;
     if (search && !c.name.toLowerCase().includes(search) && !c.id.toLowerCase().includes(search)) return false;
     return true;
   }).sort((a,b) => (statusOrder[a.status]||9) - (statusOrder[b.status]||9) || (b.days_late||0) - (a.days_late||0));
@@ -399,8 +417,8 @@ function renderAssignTable() {
   const tbody = document.getElementById('assignBody');
   tbody.innerHTML = list.map(c => {
     const asgn = assignData[c.id] || {};
-    const opts = ['', ...teamMembers].map(m =>
-      `<option value="${m}" ${asgn.assigned_to === m ? 'selected' : ''}>${m || '-- ยังไม่ได้มอบหมาย --'}</option>`
+    const opts = ['', ...currentTeamMembers()].map(m =>
+      `<option value="${m}" ${normalizeOfficerName(asgn.assigned_to) === normalizeOfficerName(m) ? 'selected' : ''}>${m || '-- ยังไม่ได้มอบหมาย --'}</option>`
     ).join('');
     return `<tr id="arow-${c.idx}">
       <td><b style="font-size:12px">${escHtml(c.name)}</b><br><span style="font-size:10px;color:#8B6500">${escHtml(c.id)}</span></td>
@@ -442,7 +460,8 @@ function handleAssignFile(input) {
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',').map(c => c.trim().replace(/['"]/g,''));
       const voltId = cols[voltIdx]; const assignedTo = cols[assignIdx];
-      if (voltId && assignedTo) rows.push({volt_id: voltId, assigned_to: assignedTo});
+      const match = currentTeamMembers().find(m => normalizeOfficerName(m) === normalizeOfficerName(assignedTo));
+      if (voltId && match) rows.push({volt_id: voltId, assigned_to: match});
     }
     status.textContent = 'กำลัง import ' + rows.length + ' รายการ...';
     let done = 0;
@@ -480,6 +499,8 @@ function saveAssignment(idx) {
   // Update local cache
   assignData[c.id] = assignData[c.id] || {};
   assignData[c.id].assigned_to = assignedTo;
+  assignData = sanitizeAssignmentData(assignData);
+  try { localStorage.setItem('volt_assignments_cache', JSON.stringify(assignData)); } catch(e) {}
   setTimeout(() => {
     const saved = document.getElementById('asaved-' + idx);
     if (saved) { saved.style.display = 'inline'; }
