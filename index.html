@@ -757,35 +757,71 @@ function closeKpiView(){
 }
 window.closeKpiView=closeKpiView;
 
-const ACTIVE_COLLECTION_TEAM = ["settasak", "collection1", "coleection2"];
-const ACTIVE_COLLECTION_TEAM_KEYS = new Set(ACTIVE_COLLECTION_TEAM.map(normalizeOfficerName));
+const DEFAULT_COLLECTION_TEAM = ["settasak", "collection1", "coleection2"];
 function normalizeOfficerName(name){
   return String(name||'').trim().toLowerCase().replace(/\s+/g,'');
 }
 function displayOfficerName(name){
   const key = normalizeOfficerName(name);
-  return ACTIVE_COLLECTION_TEAM.find(m => normalizeOfficerName(m) === key) || String(name||'').trim();
+  return currentTeamMembers().find(m => normalizeOfficerName(m) === key) || String(name||'').trim();
 }
 function sanitizeTeamMembers(names){
   const seen = new Set();
-  const team = (names || [])
-    .filter(name => ACTIVE_COLLECTION_TEAM_KEYS.has(normalizeOfficerName(name)))
-    .map(displayOfficerName)
+  const raw = (names || [])
+    .map(name => String(name||'').trim())
+    .filter(Boolean);
+  const legacyKeys = new Set(['nantapol','nantapolt','collection1','collection2','collection3']);
+  const hasLegacyDeployedTeam = raw.some(name => legacyKeys.has(normalizeOfficerName(name))) && !raw.some(name => normalizeOfficerName(name)==='coleection2');
+  const source = hasLegacyDeployedTeam ? DEFAULT_COLLECTION_TEAM : raw;
+  const team = source
     .filter(name => {
       const key = normalizeOfficerName(name);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  return team.length ? team : ACTIVE_COLLECTION_TEAM.slice();
+  return team.length ? team : DEFAULT_COLLECTION_TEAM.slice();
+}
+function currentTeamMembers(){
+  return teamMembers.length ? sanitizeTeamMembers(teamMembers) : DEFAULT_COLLECTION_TEAM.slice();
+}
+function isCurrentTeamMember(name){
+  const key = normalizeOfficerName(name);
+  return currentTeamMembers().some(m => normalizeOfficerName(m) === key);
+}
+function ensureTeamMembers(done){
+  if (teamMembers.length) { done(); return; }
+  const cb = 'voltTeamForKpi_' + Date.now();
+  let finished = false;
+  window[cb] = function(data){
+    if (finished) return;
+    finished = true;
+    teamMembers = sanitizeTeamMembers((data && data.length) ? data : DEFAULT_COLLECTION_TEAM);
+    populateTeamDropdown();
+    renderAssignFilterBar();
+    delete window[cb];
+    done();
+  };
+  const s = document.createElement('script');
+  s.src = COMMENT_SUBMIT_URL + '?action=get_team&callback=' + cb;
+  document.head.appendChild(s);
+  setTimeout(() => {
+    if (finished) return;
+    finished = true;
+    delete window[cb];
+    teamMembers = sanitizeTeamMembers(DEFAULT_COLLECTION_TEAM);
+    populateTeamDropdown();
+    renderAssignFilterBar();
+    done();
+  }, 3500);
 }
 function sanitizeKpiData(data){
   const source = data || {};
   const officers = (source.officers || [])
-    .filter(o => ACTIVE_COLLECTION_TEAM_KEYS.has(normalizeOfficerName(o.officer)))
+    .filter(o => isCurrentTeamMember(o.officer))
     .map(o => Object.assign({}, o, {officer: displayOfficerName(o.officer)}));
   const breakdown = (source.breakdown || [])
-    .filter(r => ACTIVE_COLLECTION_TEAM_KEYS.has(normalizeOfficerName(r.officer)))
+    .filter(r => isCurrentTeamMember(r.officer))
     .map(r => Object.assign({}, r, {officer: displayOfficerName(r.officer)}));
   const total = officers.reduce((a,o) => {
     a.total_contacts += Number(o.total_contacts||0);
@@ -819,7 +855,7 @@ function loadKpi(period, btnEl) {
   const cb = 'kpiCb_' + Date.now();
   window[cb] = function(data) {
     delete window[cb];
-    renderKpi(data);
+    ensureTeamMembers(() => renderKpi(data));
   };
   const s = document.createElement('script');
   s.src = 'https://script.google.com/a/macros/volt.co.th/s/AKfycby-vMGTI1t39FS4G5v1Dkdl3s9th4TzHTmljIenydR4QBNpzM9_rZ7RdzZcSpXF7KVabQ/exec?action=get_kpi&period=' + period + '&callback=' + cb;
@@ -998,7 +1034,7 @@ function renderAssignFilterBar(){
   });
   const unassigned = customers.filter(c => !(assignData[c.id] && assignData[c.id].assigned_to)).length;
   const allCount = customers.length;
-  const team = teamMembers.length ? sanitizeTeamMembers(teamMembers) : ACTIVE_COLLECTION_TEAM;
+  const team = currentTeamMembers();
   let html = `<button class="assign-btn ${!activeAssignFilter?'active':''}" onclick="setAssignFilter(null)">ทั้งหมด <span class="assign-count">${allCount}</span></button>`;
   team.forEach(m => {
     const cnt = Object.keys(counts).reduce((n,key) => normalizeOfficerName(key)===normalizeOfficerName(m) ? n + counts[key] : n, 0);
@@ -1011,7 +1047,7 @@ function renderAssignFilterBar(){
 }
 
 function autoSplitAssign(){
-  const members = teamMembers.length ? teamMembers : ACTIVE_COLLECTION_TEAM;
+  const members = currentTeamMembers();
   const confirmed = confirm('แบ่งงานให้ '+members.join(' และ ')+' เท่าๆกัน?\nลูกค้าทั้งหมด '+customers.length+' ราย');
   if(!confirmed) return;
   const voltIds = customers.map(c => c.id);
