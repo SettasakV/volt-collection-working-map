@@ -142,6 +142,17 @@
 #map .leaflet-right{right:0;}
 #map .leaflet-control{pointer-events:auto;}
 #map .leaflet-control-attribution{font-size:10px;line-height:1.2;background:rgba(255,255,255,.82);margin:0 4px 4px 0;}
+
+/* Leaflet must not inherit the loading flex centering from #map */
+#map.leaflet-container{display:block!important;align-items:initial!important;justify-content:initial!important;text-align:left!important;padding:0!important;}
+#map.leaflet-container .leaflet-control-container{position:static!important;inset:auto!important;pointer-events:auto!important;}
+#map.leaflet-container .leaflet-top,#map.leaflet-container .leaflet-bottom{position:absolute!important;z-index:1000!important;pointer-events:none!important;}
+#map.leaflet-container .leaflet-top{top:0!important;}
+#map.leaflet-container .leaflet-bottom{bottom:0!important;}
+#map.leaflet-container .leaflet-left{left:0!important;}
+#map.leaflet-container .leaflet-right{right:0!important;}
+#map.leaflet-container .leaflet-control{pointer-events:auto!important;}
+#map.leaflet-container .leaflet-control-attribution{float:right!important;margin:0 0 0 0!important;background:rgba(255,255,255,.82)!important;}
 </style><link rel="stylesheet" href="volt-restyle.css">
 </head><body>
 <div class="assign-view" id="assignView">
