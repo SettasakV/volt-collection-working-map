@@ -132,6 +132,16 @@
 .map-controls .assign-filter-bar{margin:0 -10px 0;border-left:0;border-right:0;border-bottom:0;border-radius:0 0 6px 6px;}
 .map-column .map-shell{height:auto;min-height:800px;overflow:hidden!important;padding:10px!important;position:relative;z-index:1;}
 .map-column #map{height:800px;overflow:hidden!important;position:relative!important;z-index:1;}
+
+/* Keep Leaflet attribution and zoom controls inside the map corners */
+#map .leaflet-control-container{position:absolute;inset:0;z-index:900;pointer-events:none;}
+#map .leaflet-top,#map .leaflet-bottom{position:absolute;z-index:901;pointer-events:none;}
+#map .leaflet-top{top:0;}
+#map .leaflet-bottom{bottom:0;}
+#map .leaflet-left{left:0;}
+#map .leaflet-right{right:0;}
+#map .leaflet-control{pointer-events:auto;}
+#map .leaflet-control-attribution{font-size:10px;line-height:1.2;background:rgba(255,255,255,.82);margin:0 4px 4px 0;}
 </style><link rel="stylesheet" href="volt-restyle.css">
 </head><body>
 <div class="assign-view" id="assignView">
