@@ -116,6 +116,14 @@
 .kpi-note{font-size:11px;color:#7A6800;text-align:center;margin-top:8px}
 .kpi-empty{text-align:center;padding:40px;color:#888;font-size:13px}
 
+
+/* Map drag layer fix: keep filter controls separate from Leaflet panes */
+.map-shell{position:relative;isolation:isolate;overflow:visible!important;padding-top:14px!important;}
+.map-shell .toolbar{position:relative;z-index:3002;background:white;padding:0 0 8px;margin-bottom:0;}
+.map-shell .assign-filter-bar{position:relative;z-index:3001;margin:0 0 10px;overflow:visible!important;box-shadow:0 1px 0 rgba(196,144,0,.18);}
+#map{position:relative!important;z-index:1;overflow:hidden!important;margin-top:0;contain:layout paint;touch-action:none;}
+#map .leaflet-pane{z-index:400;}
+#map .leaflet-control-container{position:relative;z-index:900;}
 </style><link rel="stylesheet" href="volt-restyle.css">
 </head><body>
 <div class="assign-view" id="assignView">
