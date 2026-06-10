@@ -930,6 +930,112 @@ function ensureTeamMembers(done){
     done();
   }, 3500);
 }
+function hasKpiActivityData(data){
+  const source = data || {};
+  const total = source.total || {};
+  const officers = source.officers || [];
+  const breakdown = source.breakdown || [];
+  if (Number(total.total_contacts||0) || Number(total.successful||0) || Number(total.ptp_count||0) || Number(total.ptp_amount||0) || Number(total.cases_closed||0)) return true;
+  return officers.some(o => Number(o.total_contacts||0) || Number(o.successful||0) || Number(o.ptp_count||0) || Number(o.ptp_amount||0) || Number(o.cases_closed||0)) || breakdown.length > 0;
+}
+function buildKpiWorkloadFallback(period){
+  const team = currentTeamMembers();
+  const rowsByOfficer = {};
+  const ensureRow = name => rowsByOfficer[name] || (rowsByOfficer[name] = {
+    officer:name,total_cases:0,overdue_cases:0,overdue_amount:0,current:0,late:0,npl:0,resell:0,not_installed:0
+  });
+  team.forEach(ensureRow);
+  ensureRow('ยังไม่มอบหมาย');
+  customers.forEach(c => {
+    const assigned = (assignData[c.id] && assignData[c.id].assigned_to) || '';
+    const officer = assigned ? displayOfficerName(assigned) : 'ยังไม่มอบหมาย';
+    const row = ensureRow(officer);
+    row.total_cases += 1;
+    row.overdue_amount += Number(c.overdue||0);
+    if (Number(c.overdue||0) > 0 || c.status === 'Late' || c.status === 'NPL') row.overdue_cases += 1;
+    if (c.status === 'Current') row.current += 1;
+    else if (c.status === 'Late') row.late += 1;
+    else if (c.status === 'NPL') row.npl += 1;
+    else if (c.status === 'Resell') row.resell += 1;
+    else if (c.status === 'Not Installed') row.not_installed += 1;
+  });
+  const rows = Object.values(rowsByOfficer).filter(r => r.total_cases || r.officer !== 'ยังไม่มอบหมาย');
+  const total = rows.reduce((a,r) => {
+    a.total_cases += r.total_cases;
+    a.overdue_cases += r.overdue_cases;
+    a.overdue_amount += r.overdue_amount;
+    a.current += r.current;
+    a.late += r.late;
+    a.npl += r.npl;
+    a.resell += r.resell;
+    a.not_installed += r.not_installed;
+    return a;
+  }, {total_cases:0,overdue_cases:0,overdue_amount:0,current:0,late:0,npl:0,resell:0,not_installed:0});
+  return {
+    period,
+    generated_at:new Date().toLocaleString('th-TH'),
+    workload_mode:true,
+    workloadRows:rows.sort((a,b) => (b.overdue_cases-a.overdue_cases) || (b.overdue_amount-a.overdue_amount) || (b.total_cases-a.total_cases)),
+    workloadTotal:total
+  };
+}
+function renderKpiWorkload(data){
+  const t = data.workloadTotal || {};
+  const periodLabel = data.period === 'week' ? '7 วันที่ผ่านมา' : data.period === 'month' ? 'เดือนนี้' : 'ทั้งหมด';
+  const grid = document.getElementById('kpiSummaryGrid');
+  grid.innerHTML = [
+    [t.total_cases || 0, 'งานบนแผนที่ทั้งหมด', false],
+    [t.overdue_cases || 0, 'รายที่ค้างชำระ', false],
+    [(t.overdue_amount || 0).toLocaleString('th-TH'), 'ยอดค้างชำระ (บาท)', true],
+    [t.late || 0, 'Late', false],
+    [t.npl || 0, 'NPL', true],
+    [t.resell || 0, 'Resell / รอถอด', false],
+  ].map(([v, lbl, hl]) =>
+    `<div class="kpi-stat ${hl ? 'highlight' : ''}">
+      <div class="kpi-stat-val">${v}</div>
+      <div class="kpi-stat-lbl">${lbl}</div>
+    </div>`
+  ).join('');
+  const rows = (data.workloadRows || []).map(r => `<tr>
+    <td><strong>${escHtml(r.officer)}</strong></td>
+    <td style="text-align:center">${r.total_cases}</td>
+    <td style="text-align:center">${r.overdue_cases}</td>
+    <td style="text-align:right">${(r.overdue_amount||0).toLocaleString('th-TH')}</td>
+    <td style="text-align:center">${r.current}</td>
+    <td style="text-align:center">${r.late}</td>
+    <td style="text-align:center">${r.npl}</td>
+    <td style="text-align:center">${r.resell}</td>
+    <td style="text-align:center">${r.not_installed}</td>
+  </tr>`).join('');
+  document.getElementById('kpiTableWrap').innerHTML = `
+    <table class="kpi-table">
+      <thead><tr>
+        <th>Officer</th>
+        <th style="text-align:center">Assigned</th>
+        <th style="text-align:center">Overdue</th>
+        <th style="text-align:right">Overdue Amount</th>
+        <th style="text-align:center">Current</th>
+        <th style="text-align:center">Late</th>
+        <th style="text-align:center">NPL</th>
+        <th style="text-align:center">Resell</th>
+        <th style="text-align:center">Not Installed</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr class="total-row">
+        <td>รวมทั้งหมด</td>
+        <td style="text-align:center">${t.total_cases||0}</td>
+        <td style="text-align:center">${t.overdue_cases||0}</td>
+        <td style="text-align:right">${(t.overdue_amount||0).toLocaleString('th-TH')}</td>
+        <td style="text-align:center">${t.current||0}</td>
+        <td style="text-align:center">${t.late||0}</td>
+        <td style="text-align:center">${t.npl||0}</td>
+        <td style="text-align:center">${t.resell||0}</td>
+        <td style="text-align:center">${t.not_installed||0}</td>
+      </tr></tfoot>
+    </table>`;
+  document.getElementById('kpiNote').textContent =
+    'ข้อมูล: ' + periodLabel + ' | แสดง Workload จากข้อมูลบนแผนที่ เพราะ KPI Activity จาก Comment Log ยังไม่มีข้อมูลในช่วงนี้หรือโหลดไม่สำเร็จ | อัปเดต: ' + (data.generated_at || '');
+}
 function sanitizeKpiData(data){
   const source = data || {};
   const officers = (source.officers || [])
@@ -970,15 +1076,16 @@ function loadKpi(period, btnEl) {
   const cb = 'kpiCb_' + Date.now();
   window[cb] = function(data) {
     delete window[cb];
-    ensureTeamMembers(() => renderKpi(data));
+    ensureTeamMembers(() => renderKpi(hasKpiActivityData(data) ? data : buildKpiWorkloadFallback(period)));
   };
   const s = document.createElement('script');
   s.src = 'https://script.google.com/a/macros/volt.co.th/s/AKfycby-vMGTI1t39FS4G5v1Dkdl3s9th4TzHTmljIenydR4QBNpzM9_rZ7RdzZcSpXF7KVabQ/exec?action=get_kpi&period=' + period + '&callback=' + cb;
   document.head.appendChild(s);
-  setTimeout(() => { if (window[cb]) { delete window[cb]; document.getElementById('kpiTableWrap').innerHTML = '<div class="kpi-empty">โหลดไม่สำเร็จ — ตรวจสอบการ Deploy Apps Script</div>'; } }, 10000);
+  setTimeout(() => { if (window[cb]) { delete window[cb]; ensureTeamMembers(() => renderKpi(buildKpiWorkloadFallback(period))); } }, 10000);
 }
 
 function renderKpi(data) {
+  if (data && data.workload_mode) { renderKpiWorkload(data); return; }
   data = sanitizeKpiData(data);
   if (!data || !data.officers) return;
   const t = data.total || {};
