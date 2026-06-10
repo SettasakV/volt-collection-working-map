@@ -145,6 +145,7 @@
         <option value="NPL">NPL</option>
         <option value="Late">Late</option>
         <option value="Current">Current</option>
+        <option value="Resell">Resell</option>
         <option value="Not Installed">Not Installed</option>
       </select>
       <select id="assignFilterPerson" onchange="renderAssignTable()" style="border:1px solid #C49000;border-radius:6px;padding:6px 10px;font-size:13px">
@@ -306,6 +307,7 @@ let assignData = {};       // volt_id → {assigned_to, ...}
 let activeAssignFilter = null; // null=ทั้งหมด, string=ชื่อ, "__none__"=ยังไม่มอบหมาย
 let teamMembers = [];      // list of team members
 let assignLoaded = false;
+const MANAGER_ASSIGN_RULE_ENABLED = true;
 
 function openAssignView() {
   document.getElementById('assignView').classList.add('open');
@@ -333,7 +335,7 @@ function closeAssignView() {
 }
 
 function loadAssignData() {
-  const DEFAULT_TEAM = ["settasak", "collection1", "coleection2"];
+  const DEFAULT_TEAM = ["settasak", "POP", "eve"];
   const countEl = document.getElementById('assignCount');
   if (countEl) countEl.textContent = 'กำลังโหลดทีม...';
   assignLoaded = false;
@@ -342,6 +344,7 @@ function loadAssignData() {
     teamMembers = sanitizeTeamMembers((names && names.length) ? names : DEFAULT_TEAM);
     populateTeamDropdown();
     assignData = loadAssignmentCacheForCurrentTeam();
+    applyManagerAssignmentRules();
     renderAssignTable();
     renderAssignFilterBar();
     rebuild();
@@ -374,6 +377,7 @@ function loadAssignmentsFromBackend(){
   window[cbAssign] = function(data) {
     delete window[cbAssign];
     assignData = sanitizeAssignmentData(data || {});
+    applyManagerAssignmentRules();
     saveAssignmentCacheForCurrentTeam();
     assignLoaded = true;
     renderAssignTable();
@@ -454,8 +458,8 @@ function renderAssignTable() {
 
   document.getElementById('assignCount').textContent = list.length + ' ราย';
 
-  const statusColors = {NPL:'#FDECEC', Late:'#FFF8E1', Current:'#E8F8EE', 'Not Installed':'#F5F5F5'};
-  const statusText = {NPL:'#C0392B', Late:'#C75000', Current:'#1f9d55', 'Not Installed':'#5D6D7E'};
+  const statusColors = {NPL:'#FDECEC', Late:'#FFF8E1', Current:'#E8F8EE', 'Not Installed':'#F5F5F5', Resell:'#F3E8FF'};
+  const statusText = {NPL:'#C0392B', Late:'#C75000', Current:'#1f9d55', 'Not Installed':'#5D6D7E', Resell:'#6D28D9'};
 
   const tbody = document.getElementById('assignBody');
   tbody.innerHTML = list.map(c => {
@@ -483,7 +487,7 @@ function getFilteredAssignCustomers(){
   const filterStatus = document.getElementById('assignFilterStatus').value;
   const filterPerson = document.getElementById('assignFilterPerson').value;
   const search = (document.getElementById('assignSearch').value || '').toLowerCase();
-  const statusOrder = {NPL:0, Late:1, Current:2, 'Not Installed':3};
+  const statusOrder = {NPL:0, Resell:1, Late:2, Current:3, 'Not Installed':4};
   return customers.filter(c => {
     if (filterStatus && c.status !== filterStatus) return false;
     const asgn = assignData[c.id] || {};
@@ -872,7 +876,7 @@ function closeKpiView(){
 }
 window.closeKpiView=closeKpiView;
 
-const DEFAULT_COLLECTION_TEAM = ["settasak", "collection1", "coleection2"];
+const DEFAULT_COLLECTION_TEAM = ["settasak", "POP", "eve"];
 function normalizeOfficerName(name){
   return String(name||'').trim().toLowerCase().replace(/\s+/g,'');
 }
@@ -895,7 +899,48 @@ function sanitizeTeamMembers(names){
       seen.add(key);
       return true;
     });
+  DEFAULT_COLLECTION_TEAM.forEach(name => {
+    const key = normalizeOfficerName(name);
+    if (!seen.has(key)) {
+      seen.add(key);
+      team.push(name);
+    }
+  });
   return team.length ? team : DEFAULT_COLLECTION_TEAM.slice();
+}
+function customerGroupCode(c){
+  const raw = String(c.crm_id || c.id || '').trim().toUpperCase();
+  if (raw.startsWith('VC')) return 'VC';
+  if (raw.startsWith('VL') || raw.startsWith('28')) return 'VL';
+  return '';
+}
+function managerRuleAssignee(c){
+  const group = customerGroupCode(c);
+  const dpd = Number(c.days_late || 0);
+  if (c.status === 'NPL' || c.status === 'Resell') return 'settasak';
+  if (group === 'VC') return 'POP';
+  if (group === 'VL' && dpd >= 1 && dpd <= 30) return 'POP';
+  if (group === 'VL' && dpd >= 31) return 'eve';
+  return '';
+}
+function applyManagerAssignmentRules(){
+  if (!MANAGER_ASSIGN_RULE_ENABLED) return;
+  const team = currentTeamMembers();
+  let changed = false;
+  customers.forEach(c => {
+    const target = managerRuleAssignee(c);
+    if (!target) return;
+    const match = team.find(m => normalizeOfficerName(m) === normalizeOfficerName(target)) || target;
+    assignData[c.id] = Object.assign({}, assignData[c.id] || {}, {
+      assigned_to: match,
+      assignment_rule: 'manager_rule_2026_06_10'
+    });
+    changed = true;
+  });
+  if (changed) {
+    assignData = sanitizeAssignmentData(assignData);
+    saveAssignmentCacheForCurrentTeam();
+  }
 }
 function currentTeamMembers(){
   return teamMembers.length ? sanitizeTeamMembers(teamMembers) : DEFAULT_COLLECTION_TEAM.slice();
