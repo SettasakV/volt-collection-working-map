@@ -129,7 +129,7 @@
 <div class="assign-view" id="assignView">
   <div class="assign-box">
     <div class="assign-header">
-      <div class="assign-title">📋 Assignment View — มอบหมายงาน</div><div style="display:flex;gap:8px;align-items:center"><button onclick="autoSplitAssign()" style="background:#2d7a2d;color:white;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700">⚡ แบ่งงานอัตโนมัติ</button><button onclick="closeAssignView()" style="background:#C49000 !important;color:#1C1A00 !important;border:none !important;border-radius:6px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">✕ ปิด</button></div>
+      <div class="assign-title">📋 Assignment View — มอบหมายงาน</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button onclick="applyManagerRuleToAssignmentLog()" style="background:#1C1A00;color:#FFC400;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700">Apply Manager Rule to Log</button><button onclick="autoSplitAssign()" style="background:#2d7a2d;color:white;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700">⚡ แบ่งงานอัตโนมัติ</button><button onclick="closeAssignView()" style="background:#C49000 !important;color:#1C1A00 !important;border:none !important;border-radius:6px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">✕ ปิด</button></div>
     </div>
     <div style="margin-bottom:10px;padding:10px;background:#FFFBE6;border-radius:6px;border:1px solid #e8d99a">
   <div style="font-size:12px;font-weight:700;color:#8B6500;margin-bottom:6px">📥 Import Assignment จากไฟล์ (CSV/Excel)</div>
@@ -137,6 +137,7 @@
     <input type="file" id="assignFile" accept=".csv,.xlsx,.xls" onchange="handleAssignFile(this)" style="font-size:12px">
     <span style="font-size:11px;color:#8B6500">ไฟล์ต้องมี column: <b>volt_id</b>, <b>assigned_to</b></span>
     <span id="importStatus" style="font-size:12px;color:#1f9d55"></span>
+    <span id="managerRuleStatus" style="font-size:12px;color:#1f9d55"></span>
   </div>
 </div>
 <div class="assign-filters">
@@ -917,6 +918,7 @@ function customerGroupCode(c){
 function managerRuleAssignee(c){
   const group = customerGroupCode(c);
   const dpd = Number(c.days_late || 0);
+  if (c.status === 'Not Installed') return '';
   if (c.status === 'NPL' || c.status === 'Resell') return 'settasak';
   if (group === 'VC') return 'POP';
   if (group === 'VL' && dpd >= 1 && dpd <= 30) return 'POP';
@@ -1350,6 +1352,74 @@ function autoSplitAssign(){
 window.setAssignFilter = setAssignFilter;
 window.renderAssignFilterBar = renderAssignFilterBar;
 window.autoSplitAssign = autoSplitAssign;
+function managerRuleAssignmentGroups(){
+  const groups = {};
+  customers.forEach(c => {
+    const assignedTo = managerRuleAssignee(c);
+    if (!assignedTo) return;
+    if (!groups[assignedTo]) groups[assignedTo] = [];
+    groups[assignedTo].push(c);
+  });
+  return groups;
+}
+function postManagerRuleBatch_(assignedTo, list, delayMs){
+  setTimeout(() => {
+    const payload = {
+      action: 'auto_assign',
+      volt_ids: JSON.stringify(list.map(c => c.id)),
+      members: JSON.stringify([assignedTo]),
+      assigned_by: localStorage.getItem('volt_comment_by') || 'Manager Rule',
+      customer_names: JSON.stringify(list.map(c => c.name || '')),
+      segments: JSON.stringify(list.map(c => deriveSegment_(c))),
+      buckets: JSON.stringify(list.map(c => c.bucket || '')),
+      overdues: JSON.stringify(list.map(c => Number(c.overdue || 0)))
+    };
+    postToScript_(payload, 'managerRuleFrame_' + normalizeOfficerName(assignedTo));
+  }, delayMs);
+}
+function applyManagerRuleToAssignmentLog(){
+  const groups = managerRuleAssignmentGroups();
+  const order = ['POP','eve','settasak'];
+  const counts = order.map(name => [name, groups[name] ? groups[name].length : 0]);
+  const total = counts.reduce((s, row) => s + row[1], 0);
+  if (!total) { alert('ไม่มีรายการที่เข้า rule สำหรับ assignment'); return; }
+  const msg = 'ยืนยันเขียน Assignment ตาม Manager Rule เข้า Comment Log / Assignment Log หรือไม่?\\n\\n'
+    + counts.map(row => row[0] + ': ' + row[1] + ' ราย').join('\\n')
+    + '\\n\\nระบบจะเขียนทับ assignment ปัจจุบันของรายการที่เข้า rule และบันทึก history ทุกเคส';
+  if (!confirm(msg)) return;
+  counts.forEach(row => {
+    const name = row[0];
+    (groups[name] || []).forEach(c => {
+      assignData[c.id] = Object.assign({}, assignData[c.id] || {}, {
+        assigned_to: name,
+        assignment_rule: 'manager_rule_2026_06_10'
+      });
+    });
+  });
+  assignData = sanitizeAssignmentData(assignData);
+  saveAssignmentCacheForCurrentTeam();
+  renderAssignFilterBar();
+  renderAssignTable();
+  rebuild();
+  const status = document.getElementById('managerRuleStatus');
+  if (status) status.textContent = 'กำลังส่ง batch เข้า Assignment Log...';
+  let delay = 0;
+  order.forEach(name => {
+    const list = groups[name] || [];
+    if (!list.length) return;
+    postManagerRuleBatch_(name, list, delay);
+    delay += 2500;
+  });
+  setTimeout(() => {
+    if (status) status.textContent = 'ส่ง Manager Rule แล้ว กำลัง refresh assignment...';
+    loadAssignmentsFromBackend();
+  }, delay + 2500);
+  setTimeout(() => {
+    if (status) status.textContent = 'ส่ง Manager Rule เข้า Assignment Log แล้ว';
+    alert('ส่ง Manager Rule เข้า Assignment Log แล้ว\\n' + counts.map(row => row[0] + ': ' + row[1] + ' ราย').join('\\n'));
+  }, delay + 5500);
+}
+window.applyManagerRuleToAssignmentLog = applyManagerRuleToAssignmentLog;
 function toggleAcc(hdr){var b=hdr.nextElementSibling;var o=b.style.display!=='none';b.style.display=o?'none':'block';hdr.classList.toggle('open',!o);}
 window.addEventListener('load',()=>{updatePortfolioSummary();initMap();loadLatestComments();renderReviewLayer();loadAssignData();});
 </script><script src="volt-province-enhance.js" defer></script>
