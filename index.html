@@ -1038,7 +1038,7 @@ function buildKpiWorkloadFallback(period){
 }
 function renderKpiWorkload(data){
   const t = data.workloadTotal || {};
-  const periodLabel = data.period === 'week' ? '7 วันที่ผ่านมา' : data.period === 'month' ? 'เดือนนี้' : 'ทั้งหมด';
+  const periodLabel = data.period === 'week' ? '7 วันที่ผ่านมา' : data.period === 'month' ? 'เคสที่ได้รับมอบหมาย' : 'ทั้งหมด';
   const grid = document.getElementById('kpiSummaryGrid');
   grid.innerHTML = [
     [t.total_cases || 0, 'งานบนแผนที่ทั้งหมด', false],
@@ -1146,7 +1146,7 @@ function renderKpi(data) {
   data = sanitizeKpiData(data);
   if (!data || !data.officers) return;
   const t = data.total || {};
-  const periodLabel = data.period === 'week' ? '7 วันที่ผ่านมา' : data.period === 'month' ? 'เดือนนี้' : 'ทั้งหมด';
+  const periodLabel = data.period === 'week' ? '7 วันที่ผ่านมา' : data.period === 'month' ? 'เคสที่ได้รับมอบหมาย' : 'ทั้งหมด';
 
   // ─── Summary cards (ยอดรวมทีม) ──────────────────────────────────────
   const grid = document.getElementById('kpiSummaryGrid');
@@ -1473,7 +1473,7 @@ window.addEventListener('load',()=>{updatePortfolioSummary();initMap();loadLates
       <div class="kpi-title">📊 KPI Dashboard — ผลงานทีม Collection</div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="kpi-period-tabs">
-          <button class="kpi-ptab active" onclick="loadKpi('month',this)">เดือนนี้</button>
+          <button class="kpi-ptab active" onclick="loadKpi('month',this)">งานมอบหมาย</button>
           <button class="kpi-ptab" onclick="loadKpi('week',this)">7 วัน</button>
           <button class="kpi-ptab" onclick="loadKpi('all',this)">ทั้งหมด</button>
         </div>
